@@ -1,0 +1,12 @@
+{
+  "name": "@e-invoice/web-admin",
+  "nx": {
+    "targets": {
+      "dev": {
+        "options": {
+          "port": 4200
+        }
+      }
+    }
+  }
+}

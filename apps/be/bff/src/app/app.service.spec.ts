@@ -12,9 +12,10 @@ describe('AppService', () => {
     service = app.get<AppService>(AppService);
   });
 
-  describe('getData', () => {
-    it('should return "Hello API"', () => {
-      expect(service.getData()).toEqual({ message: 'Hello API' });
+  describe('getHealth', () => {
+    it('should return status ok and initial invoices', () => {
+      const health = service.getHealth();
+      expect(health.status).toEqual('ok');
     });
   });
 });

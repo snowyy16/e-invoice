@@ -6,6 +6,7 @@ allowBuilds:
   '@nestjs/core': false
   sharp: false
   '@swc/core': false
+  protobufjs: set this to true or false
 packages:
   - 'apps/**'
   - 'libs/*'

@@ -1,471 +1,1852 @@
-/* oxlint-disable jsx-a11y/prefer-tag-over-role -- the icons below
-   are inline SVGs, which have no tag to swap the role for. */
-import styles from './page.module.css';
+'use client';
 
-export default function Index() {
-  /*
-   * Replace the elements below with your own.
-   *
-   * Note: The corresponding styles are in the ./index.css file.
-   */
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import {
+  AuthUser,
+  getStoredUser,
+  clearStoredUser,
+  setStoredUser,
+  DEMO_CREDENTIALS,
+} from '../lib/auth';
+import { numberToVietnameseWords } from '@e-invoice/utils';
+
+type Status = 'PENDING' | 'ISSUED' | 'PAID';
+
+interface InvoiceCard {
+  id: string;
+  invoiceNumber: string;
+  lookupCode: string;
+  buyerName: string;
+  buyerTaxCode: string;
+  buyerEmail?: string;
+  subTotal?: number;
+  vatAmount?: number;
+  totalAmount: number;
+  status: Status;
+  taxAuthorityCode?: string;
+  signedAt?: string;
+  signedBy?: string;
+}
+
+interface SystemUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  isActive?: boolean;
+}
+
+const INITIAL_INVOICES: InvoiceCard[] = [
+  {
+    id: 'inv-1',
+    invoiceNumber: 'INV-2026-0001',
+    lookupCode: 'EINV-DEMO01',
+    buyerName: 'Công ty TNHH Công Nghệ FPT',
+    buyerTaxCode: '0101248141',
+    buyerEmail: 'ketoan@fpt.com',
+    subTotal: 10000000,
+    vatAmount: 800000,
+    totalAmount: 10800000,
+    status: 'ISSUED',
+    taxAuthorityCode: 'CQT-0101248141-2601A98BC',
+    signedAt: '2026-11-10T14:30:00.000Z',
+    signedBy: 'Nguyễn Văn A (Kế toán trưởng)',
+  },
+  {
+    id: 'inv-2',
+    invoiceNumber: 'INV-2026-0002',
+    lookupCode: 'EINV-DEMO02',
+    buyerName: 'Tập đoàn Viễn thông Viettel',
+    buyerTaxCode: '0100109106',
+    buyerEmail: 'billing@viettel.com.vn',
+    subTotal: 24000000,
+    vatAmount: 2400000,
+    totalAmount: 26400000,
+    status: 'PENDING',
+  },
+];
+
+export default function AdminDashboardPage() {
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [invoices, setInvoices] = useState<InvoiceCard[]>(INITIAL_INVOICES);
+  const [usersList, setUsersList] = useState<SystemUser[]>([]);
+  const [activeTab, setActiveTab] = useState<'KANBAN' | 'USERS'>('KANBAN');
+  const [buyerName, setBuyerName] = useState('');
+  const [buyerTaxCode, setBuyerTaxCode] = useState('');
+  const [amount, setAmount] = useState('5400000');
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceCard | null>(
+    null,
+  );
+
+  const API_URL =
+    process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+
+  useEffect(() => {
+    const stored = getStoredUser();
+    if (stored) {
+      setCurrentUser(stored);
+    }
+
+    fetch(`${API_URL}/invoices`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) setInvoices(data);
+      })
+      .catch((err) => {
+        console.warn('Invoices fetch fallback:', err);
+      });
+
+    fetch(`${API_URL}/users`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setUsersList(data);
+      })
+      .catch((err) => {
+        console.warn('Users fetch fallback:', err);
+      });
+  }, [API_URL]);
+
+  const handleLogout = () => {
+    clearStoredUser();
+    setCurrentUser(null);
+  };
+
+  const handleSwitchDemoUser = (
+    roleKey: 'ADMIN' | 'CHIEF_ACCOUNTANT' | 'ACCOUNTANT',
+  ) => {
+    const cred = DEMO_CREDENTIALS[roleKey];
+    const newUser: AuthUser = {
+      id: `demo-${roleKey.toLowerCase()}`,
+      email: cred.email,
+      fullName: cred.fullName,
+      role: cred.role,
+    };
+    setStoredUser(newUser);
+    setCurrentUser(newUser);
+  };
+
+  const moveStatus = (id: string, nextStatus: Status) => {
+    const signer = currentUser?.fullName || 'Nguyễn Văn A (Kế toán trưởng)';
+    const nowStr = new Date().toISOString();
+    const mockCqt = `CQT-VN-${Date.now().toString(36).toUpperCase()}`;
+
+    setInvoices((prev) =>
+      prev.map((inv) =>
+        inv.id === id
+          ? {
+              ...inv,
+              status: nextStatus,
+              taxAuthorityCode:
+                nextStatus === 'ISSUED'
+                  ? inv.taxAuthorityCode || mockCqt
+                  : inv.taxAuthorityCode,
+              signedAt:
+                nextStatus === 'ISSUED' ? inv.signedAt || nowStr : inv.signedAt,
+              signedBy:
+                nextStatus === 'ISSUED' ? inv.signedBy || signer : inv.signedBy,
+            }
+          : inv,
+      ),
+    );
+
+    fetch(`${API_URL}/invoices/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: nextStatus,
+        signedBy: signer,
+      }),
+    }).catch((err) => {
+      console.warn('Status update API error:', err);
+    });
+  };
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!buyerName || !buyerTaxCode) return;
+    const numAmount = Number(amount) || 0;
+    const subTotal = Math.round(numAmount / 1.08);
+    const vatAmount = numAmount - subTotal;
+    const nextNum = String(invoices.length + 1).padStart(4, '0');
+
+    const newInvoice: InvoiceCard = {
+      id: `inv-${Date.now()}`,
+      invoiceNumber: `INV-2026-${nextNum}`,
+      lookupCode: `EINV-NEW${invoices.length + 1}`,
+      buyerName,
+      buyerTaxCode,
+      buyerEmail: 'khachhang@company.vn',
+      subTotal,
+      vatAmount,
+      totalAmount: numAmount,
+      status: 'PENDING',
+    };
+    setInvoices([newInvoice, ...invoices]);
+    setBuyerName('');
+    setBuyerTaxCode('');
+
+    fetch(`${API_URL}/invoices`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        buyerName,
+        buyerTaxCode,
+        buyerEmail: 'khachhang@company.vn',
+        items: [
+          {
+            name: 'Hóa đơn dịch vụ điện tử',
+            unit: 'Gói',
+            quantity: 1,
+            unitPrice: subTotal,
+            vatRate: 8,
+          },
+        ],
+      }),
+    }).catch((err) => {
+      console.warn('Invoice create API error:', err);
+    });
+  };
+
+  const totalRevenue = invoices.reduce((sum, i) => sum + i.totalAmount, 0);
+  const issuedCount = invoices.filter((i) => i.status === 'ISSUED').length;
+  const pendingCount = invoices.filter((i) => i.status === 'PENDING').length;
+  const paidCount = invoices.filter((i) => i.status === 'PAID').length;
+
+  const columns: {
+    key: Status;
+    label: string;
+    color: string;
+    badgeBg: string;
+    badgeColor: string;
+  }[] = [
+    {
+      key: 'PENDING',
+      label: '1. Chờ Kế toán trưởng duyệt',
+      color: '#d97706',
+      badgeBg: '#fef3c7',
+      badgeColor: '#b45309',
+    },
+    {
+      key: 'ISSUED',
+      label: '2. Đã ký số & Phát hành',
+      color: '#2563eb',
+      badgeBg: '#dbeafe',
+      badgeColor: '#1d4ed8',
+    },
+    {
+      key: 'PAID',
+      label: '3. Đã thanh toán',
+      color: '#059669',
+      badgeBg: '#d1fae5',
+      badgeColor: '#047857',
+    },
+  ];
+
+  const isChiefAccountant = currentUser?.role === 'CHIEF_ACCOUNTANT';
+  const isAccountant = currentUser?.role === 'ACCOUNTANT';
+  const isAdmin = currentUser?.role === 'ADMIN';
+
   return (
-    <div className={styles.page}>
-      <div className="wrapper">
-        <div className="container">
-          <div id="welcome">
-            <h1>
-              <span> Hello there, </span>
-              Welcome web-admin 👋
-            </h1>
+    <main
+      style={{
+        padding: '24px 32px',
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+        maxWidth: '1280px',
+        margin: '0 auto',
+        color: '#0f172a',
+        background: '#ffffff',
+      }}
+    >
+      {/* Top Application Bar */}
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '12px 20px',
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderRadius: '12px',
+          marginBottom: '24px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '8px',
+              background: '#0284c7',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 800,
+              fontSize: '18px',
+            }}
+          >
+            ⚡
           </div>
-
-          <div id="hero" className="rounded">
-            <div className="text-container">
-              <h2>
-                <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-                  />
-                </svg>
-                <span>You&apos;re up and running</span>
-              </h2>
-              <a href="#commands"> What&apos;s next? </a>
-            </div>
-            <div className="logo-container">
-              <svg
-                fill="currentColor"
-                role="img"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path d="M11.987 14.138l-3.132 4.923-5.193-8.427-.012 8.822H0V4.544h3.691l5.247 8.833.005-3.998 3.044 4.759zm.601-5.761c.024-.048 0-3.784.008-3.833h-3.65c.002.059-.005 3.776-.003 3.833h3.645zm5.634 4.134a2.061 2.061 0 0 0-1.969 1.336 1.963 1.963 0 0 1 2.343-.739c.396.161.917.422 1.33.283a2.1 2.1 0 0 0-1.704-.88zm3.39 1.061c-.375-.13-.8-.277-1.109-.681-.06-.08-.116-.17-.176-.265a2.143 2.143 0 0 0-.533-.642c-.294-.216-.68-.322-1.18-.322a2.482 2.482 0 0 0-2.294 1.536 2.325 2.325 0 0 1 4.002.388.75.75 0 0 0 .836.334c.493-.105.46.36 1.203.518v-.133c-.003-.446-.246-.55-.75-.733zm2.024 1.266a.723.723 0 0 0 .347-.638c-.01-2.957-2.41-5.487-5.37-5.487a5.364 5.364 0 0 0-4.487 2.418c-.01-.026-1.522-2.39-1.538-2.418H8.943l3.463 5.423-3.379 5.32h3.54l1.54-2.366 1.568 2.366h3.541l-3.21-5.052a.7.7 0 0 1-.084-.32 2.69 2.69 0 0 1 2.69-2.691h.001c1.488 0 1.736.89 2.057 1.308.634.826 1.9.464 1.9 1.541a.707.707 0 0 0 1.066.596zm.35.133c-.173.372-.56.338-.755.639-.176.271.114.412.114.412s.337.156.538-.311c.104-.231.14-.488.103-.74z" />
-              </svg>
-            </div>
-          </div>
-
-          <div id="middle-content">
-            <div id="learning-materials" className="rounded shadow">
-              <h2>Learning materials</h2>
-              <a
-                href="https://nx.dev/getting-started/intro?utm_source=nx-project"
-                target="_blank"
-                rel="noreferrer"
-                className="list-item-link"
-              >
-                <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                  />
-                </svg>
-                <span>
-                  Documentation
-                  <span> Everything is in there </span>
-                </span>
-                <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </a>
-              <a
-                href="https://nx.dev/blog/?utm_source=nx-project"
-                target="_blank"
-                rel="noreferrer"
-                className="list-item-link"
-              >
-                <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"
-                  />
-                </svg>
-                <span>
-                  Blog
-                  <span> Changelog, features & events </span>
-                </span>
-                <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </a>
-              <a
-                href="https://www.youtube.com/@NxDevtools/videos?utm_source=nx-project&sub_confirmation=1"
-                target="_blank"
-                rel="noreferrer"
-                className="list-item-link"
-              >
-                <svg
-                  role="img"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <title>YouTube</title>
-                  <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                </svg>
-                <span>
-                  YouTube channel
-                  <span> Nx Show, talks & tutorials </span>
-                </span>
-                <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </a>
-              <a
-                href="https://nx.dev/react-tutorial/1-code-generation?utm_source=nx-project"
-                target="_blank"
-                rel="noreferrer"
-                className="list-item-link"
-              >
-                <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
-                  />
-                </svg>
-                <span>
-                  Interactive tutorials
-                  <span> Create an app, step-by-step </span>
-                </span>
-                <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </a>
-              <a
-                href="https://nxplaybook.com/?utm_source=nx-project"
-                target="_blank"
-                rel="noreferrer"
-                className="list-item-link"
-              >
-                <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path d="M12 14l9-5-9-5-9 5 9 5z" />
-                  <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"
-                  />
-                </svg>
-                <span>
-                  Video courses
-                  <span> Nx custom courses </span>
-                </span>
-                <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </a>
-            </div>
-            <div id="other-links">
-              <a
-                id="nx-console"
-                className="button-pill rounded shadow"
-                href="https://marketplace.visualstudio.com/items?itemName=nrwl.angular-console&utm_source=nx-project"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <svg
-                  fill="currentColor"
-                  role="img"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <title>Visual Studio Code</title>
-                  <path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z" />
-                </svg>
-                <span>
-                  Install Nx Console for VSCode
-                  <span>The official VSCode extension for Nx.</span>
-                </span>
-              </a>
-              <a
-                id="nx-console-jetbrains"
-                className="button-pill rounded shadow"
-                href="https://plugins.jetbrains.com/plugin/21060-nx-console"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <svg
-                  height="48"
-                  width="48"
-                  viewBox="20 20 60 60"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path d="m22.5 22.5h60v60h-60z" />
-                  <g fill="#fff">
-                    <path d="m29.03 71.25h22.5v3.75h-22.5z" />
-                    <path d="m28.09 38 1.67-1.58a1.88 1.88 0 0 0 1.47.87c.64 0 1.06-.44 1.06-1.31v-5.98h2.58v6a3.48 3.48 0 0 1 -.87 2.6 3.56 3.56 0 0 1 -2.57.95 3.84 3.84 0 0 1 -3.34-1.55z" />
-                    <path d="m36 30h7.53v2.19h-5v1.44h4.49v2h-4.42v1.49h5v2.21h-7.6z" />
-                    <path d="m47.23 32.29h-2.8v-2.29h8.21v2.27h-2.81v7.1h-2.6z" />
-                    <path d="m29.13 43.08h4.42a3.53 3.53 0 0 1 2.55.83 2.09 2.09 0 0 1 .6 1.53 2.16 2.16 0 0 1 -1.44 2.09 2.27 2.27 0 0 1 1.86 2.29c0 1.61-1.31 2.59-3.55 2.59h-4.44zm5 2.89c0-.52-.42-.8-1.18-.8h-1.29v1.64h1.24c.79 0 1.25-.26 1.25-.81zm-.9 2.66h-1.57v1.73h1.62c.8 0 1.24-.31 1.24-.86 0-.5-.4-.87-1.27-.87z" />
-                    <path d="m38 43.08h4.1a4.19 4.19 0 0 1 3 1 2.93 2.93 0 0 1 .9 2.19 3 3 0 0 1 -1.93 2.89l2.24 3.27h-3l-1.88-2.84h-.87v2.84h-2.56zm4 4.5c.87 0 1.39-.43 1.39-1.11 0-.75-.54-1.12-1.4-1.12h-1.44v2.26z" />
-                    <path d="m49.59 43h2.5l4 9.44h-2.79l-.67-1.69h-3.63l-.67 1.69h-2.71zm2.27 5.73-1-2.65-1.06 2.65z" />
-                    <path d="m56.46 43.05h2.6v9.37h-2.6z" />
-                    <path d="m60.06 43.05h2.42l3.37 5v-5h2.57v9.37h-2.26l-3.53-5.14v5.14h-2.57z" />
-                    <path d="m68.86 51 1.45-1.73a4.84 4.84 0 0 0 3 1.13c.71 0 1.08-.24 1.08-.65 0-.4-.31-.6-1.59-.91-2-.46-3.53-1-3.53-2.93 0-1.74 1.37-3 3.62-3a5.89 5.89 0 0 1 3.86 1.25l-1.26 1.84a4.63 4.63 0 0 0 -2.62-.92c-.63 0-.94.25-.94.6 0 .42.32.61 1.63.91 2.14.46 3.44 1.16 3.44 2.91 0 1.91-1.51 3-3.79 3a6.58 6.58 0 0 1 -4.35-1.5z" />
-                  </g>
-                </svg>
-                <span>
-                  Install Nx Console for JetBrains
-                  <span>
-                    Available for WebStorm, Intellij IDEA Ultimate and more!
-                  </span>
-                </span>
-              </a>
-              <div id="nx-cloud" className="rounded shadow">
-                <div>
-                  <svg
-                    id="nx-cloud-logo"
-                    role="img"
-                    xmlns="http://www.w3.org/2000/svg"
-                    stroke="currentColor"
-                    fill="transparent"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeWidth="2"
-                      d="M23 3.75V6.5c-3.036 0-5.5 2.464-5.5 5.5s-2.464 5.5-5.5 5.5-5.5 2.464-5.5 5.5H3.75C2.232 23 1 21.768 1 20.25V3.75C1 2.232 2.232 1 3.75 1h16.5C21.768 1 23 2.232 23 3.75Z"
-                    />
-                    <path
-                      strokeWidth="2"
-                      d="M23 6v14.1667C23 21.7307 21.7307 23 20.1667 23H6c0-3.128 2.53867-5.6667 5.6667-5.6667 3.128 0 5.6666-2.5386 5.6666-5.6666C17.3333 8.53867 19.872 6 23 6Z"
-                    />
-                  </svg>
-                  <h2>
-                    Nx Cloud
-                    <span>Enable faster CI & better DX</span>
-                  </h2>
-                </div>
-                <p>
-                  You can activate distributed tasks executions and caching by
-                  running:
-                </p>
-                <pre>nx connect</pre>
-                <a
-                  href="https://nx.app/?utm_source=nx-project"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {' '}
-                  What is Nx Cloud?{' '}
-                </a>
-              </div>
-              <a
-                id="nx-repo"
-                className="button-pill rounded shadow"
-                href="https://github.com/nrwl/nx?utm_source=nx-project"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <svg
-                  fill="currentColor"
-                  role="img"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
-                </svg>
-                <span>
-                  Nx is open source
-                  <span> Love Nx? Give us a star! </span>
-                </span>
-              </a>
-            </div>
-          </div>
-
-          <div id="commands" className="rounded shadow">
-            <h2>Next steps</h2>
-            <p>Here are some things you can do with Nx:</p>
-            <details>
-              <summary>
-                <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-                Add UI library
-              </summary>
-              <pre>
-                <span># Generate UI lib</span>
-                nx g @nx/next:library ui
-                <span># Add a component</span>
-                nx g @nx/next:component ui/src/lib/button
-              </pre>
-            </details>
-            <details>
-              <summary>
-                <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-                View project details
-              </summary>
-              <pre>nx show project web-admin --web</pre>
-            </details>
-            <details>
-              <summary>
-                <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-                View interactive project graph
-              </summary>
-              <pre>nx graph</pre>
-            </details>
-            <details>
-              <summary>
-                <svg
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-                Run affected commands
-              </summary>
-              <pre>
-                <span># see what&apos;s been affected by changes</span>
-                nx affected:graph
-                <span># run tests for current changes</span>
-                nx affected:test
-                <span># run e2e tests for current changes</span>
-                nx affected:e2e
-              </pre>
-            </details>
-          </div>
-
-          <p id="love">
-            Carefully crafted with
-            <svg
-              fill="currentColor"
-              stroke="none"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
+          <div>
+            <div
+              style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a' }}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-              />
-            </svg>
+              E-INVOICE ENTERPRISE
+            </div>
+            <div style={{ fontSize: '11px', color: '#64748b' }}>
+              Chuẩn Nghị định 123/2020/NĐ-CP & Thông tư 78/2021/TT-BTC
+            </div>
+          </div>
+        </div>
+
+        {/* User Auth Info / Navigation */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {currentUser ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div
+                data-testid="user-role-badge"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 10px',
+                  borderRadius: '999px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  background:
+                    currentUser.role === 'ADMIN'
+                      ? '#fee2e2'
+                      : currentUser.role === 'CHIEF_ACCOUNTANT'
+                        ? '#ede9fe'
+                        : '#e0f2fe',
+                  color:
+                    currentUser.role === 'ADMIN'
+                      ? '#b91c1c'
+                      : currentUser.role === 'CHIEF_ACCOUNTANT'
+                        ? '#6d28d9'
+                        : '#0369a1',
+                  border:
+                    currentUser.role === 'ADMIN'
+                      ? '1px solid #fecaca'
+                      : currentUser.role === 'CHIEF_ACCOUNTANT'
+                        ? '1px solid #ddd6fe'
+                        : '1px solid #bae6fd',
+                }}
+              >
+                <span>
+                  {currentUser.role === 'ADMIN' && '🛡️'}
+                  {currentUser.role === 'CHIEF_ACCOUNTANT' && '🟣'}
+                  {currentUser.role === 'ACCOUNTANT' && '🔵'}
+                </span>
+                <span>{currentUser.role}</span>
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <div
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    color: '#0f172a',
+                  }}
+                >
+                  {currentUser.fullName}
+                </div>
+                <div style={{ fontSize: '11px', color: '#64748b' }}>
+                  {currentUser.email}
+                </div>
+              </div>
+
+              {/* Quick switch test pills */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  borderLeft: '1px solid #cbd5e1',
+                  paddingLeft: '10px',
+                  marginLeft: '4px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleSwitchDemoUser('ACCOUNTANT')}
+                  title="Chuyển sang quyền Kế toán viên"
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    borderRadius: '6px',
+                    border: '1px solid #0284c7',
+                    background: isAccountant ? '#0284c7' : '#ffffff',
+                    color: isAccountant ? '#ffffff' : '#0284c7',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Kế toán viên
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchDemoUser('CHIEF_ACCOUNTANT')}
+                  title="Chuyển sang quyền Kế toán trưởng"
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    borderRadius: '6px',
+                    border: '1px solid #7c3aed',
+                    background: isChiefAccountant ? '#7c3aed' : '#ffffff',
+                    color: isChiefAccountant ? '#ffffff' : '#7c3aed',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Kế toán trưởng
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchDemoUser('ADMIN')}
+                  title="Chuyển sang quyền Quản trị viên"
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    borderRadius: '6px',
+                    border: '1px solid #dc2626',
+                    background: isAdmin ? '#dc2626' : '#ffffff',
+                    color: isAdmin ? '#ffffff' : '#dc2626',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Admin
+                </button>
+              </div>
+
+              <button
+                data-testid="btn-logout"
+                type="button"
+                onClick={handleLogout}
+                style={{
+                  padding: '6px 12px',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#475569',
+                  cursor: 'pointer',
+                  marginLeft: '4px',
+                }}
+              >
+                Đăng xuất ⎋
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Link
+                data-testid="nav-login-accountant"
+                href="/login/accountant"
+                style={{
+                  padding: '7px 14px',
+                  background: '#0d9488',
+                  color: '#ffffff',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>💼 Cổng Kế toán</span>
+              </Link>
+              <Link
+                data-testid="nav-login-admin"
+                href="/login/admin"
+                style={{
+                  padding: '7px 14px',
+                  background: '#0f172a',
+                  color: '#ffffff',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  border: '1px solid #334155',
+                }}
+              >
+                <span>🛡️ Cổng Admin</span>
+              </Link>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Main Title & Key Metrics Grid */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1.2fr 1fr 1fr 1.2fr',
+          gap: '16px',
+          marginBottom: '24px',
+          alignItems: 'stretch',
+        }}
+      >
+        <div
+          style={{
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+          }}
+        >
+          <h1
+            data-testid="admin-title"
+            style={{
+              margin: '0 0 4px',
+              fontSize: '18px',
+              fontWeight: 800,
+              color: '#0f172a',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            E-Invoice Admin & Kanban Portal
+          </h1>
+          <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
+            Hệ thống Quản trị & Phát hành Hóa đơn điện tử chuẩn Production
           </p>
         </div>
+
+        <div
+          style={{
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '14px 18px',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '11px',
+              fontWeight: 600,
+              color: '#64748b',
+              textTransform: 'uppercase',
+            }}
+          >
+            Chờ KTT Duyệt
+          </div>
+          <div
+            style={{
+              fontSize: '22px',
+              fontWeight: 800,
+              color: '#d97706',
+              marginTop: '2px',
+            }}
+          >
+            {pendingCount}{' '}
+            <span
+              style={{ fontSize: '12px', fontWeight: 500, color: '#64748b' }}
+            >
+              hóa đơn
+            </span>
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '14px 18px',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '11px',
+              fontWeight: 600,
+              color: '#64748b',
+              textTransform: 'uppercase',
+            }}
+          >
+            Đã Ký & Thanh toán
+          </div>
+          <div
+            style={{
+              fontSize: '22px',
+              fontWeight: 800,
+              color: '#059669',
+              marginTop: '2px',
+            }}
+          >
+            {issuedCount + paidCount}{' '}
+            <span
+              style={{ fontSize: '12px', fontWeight: 500, color: '#64748b' }}
+            >
+              hóa đơn
+            </span>
+          </div>
+        </div>
+
+        <div
+          data-testid="total-revenue"
+          style={{
+            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+            border: '1px solid #bfdbfe',
+            borderRadius: '12px',
+            padding: '14px 18px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '11px',
+              fontWeight: 700,
+              color: '#1e40af',
+              textTransform: 'uppercase',
+            }}
+          >
+            Tổng giá trị Hóa đơn
+          </div>
+          <div
+            style={{
+              fontSize: '20px',
+              fontWeight: 900,
+              color: '#1d4ed8',
+              marginTop: '2px',
+            }}
+          >
+            {totalRevenue.toLocaleString('vi-VN')} VNĐ
+          </div>
+        </div>
       </div>
-    </div>
+
+      {/* Admin Tab Switcher if user is ADMIN */}
+      {isAdmin && (
+        <div
+          style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid #e2e8f0',
+            paddingBottom: '10px',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setActiveTab('KANBAN')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              background: activeTab === 'KANBAN' ? '#0f172a' : '#f1f5f9',
+              color: activeTab === 'KANBAN' ? '#ffffff' : '#475569',
+              fontWeight: 700,
+              fontSize: '13px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span>📋</span> Bảng Tiến trình Hóa đơn (Kanban)
+          </button>
+          <button
+            type="button"
+            data-testid="tab-user-management"
+            onClick={() => setActiveTab('USERS')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              background: activeTab === 'USERS' ? '#0f172a' : '#f1f5f9',
+              color: activeTab === 'USERS' ? '#ffffff' : '#475569',
+              fontWeight: 700,
+              fontSize: '13px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span>👥</span> Quản lý Người dùng & Phân quyền Hệ thống
+            (PostgreSQL)
+          </button>
+        </div>
+      )}
+
+      {/* Admin User Management Section */}
+      {isAdmin && activeTab === 'USERS' ? (
+        <section
+          data-testid="admin-users-section"
+          style={{
+            background: '#ffffff',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+            overflow: 'hidden',
+            marginBottom: '24px',
+          }}
+        >
+          <div
+            style={{
+              padding: '16px 20px',
+              background: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <div>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: '15px',
+                  fontWeight: 800,
+                  color: '#0f172a',
+                }}
+              >
+                Danh sách Tài khoản Phân quyền Hệ thống
+              </h2>
+              <p
+                style={{
+                  margin: '2px 0 0',
+                  fontSize: '12px',
+                  color: '#64748b',
+                }}
+              >
+                Đồng bộ trực tiếp từ cơ sở dữ liệu phân quyền PostgreSQL (bảng
+                users)
+              </p>
+            </div>
+            <span
+              style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#059669',
+                background: '#ecfdf5',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                border: '1px solid #a7f3d0',
+              }}
+            >
+              ● Database Online (PostgreSQL)
+            </span>
+          </div>
+
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              textAlign: 'left',
+              fontSize: '13px',
+            }}
+          >
+            <thead>
+              <tr
+                style={{
+                  background: '#f8fafc',
+                  borderBottom: '1px solid #e2e8f0',
+                  color: '#64748b',
+                }}
+              >
+                <th style={{ padding: '12px 18px', fontWeight: 600 }}>
+                  Họ và tên
+                </th>
+                <th style={{ padding: '12px 18px', fontWeight: 600 }}>
+                  Email Đăng nhập
+                </th>
+                <th style={{ padding: '12px 18px', fontWeight: 600 }}>
+                  Vai trò (Role)
+                </th>
+                <th style={{ padding: '12px 18px', fontWeight: 600 }}>
+                  Cổng Đăng nhập Phụ trách
+                </th>
+                <th style={{ padding: '12px 18px', fontWeight: 600 }}>
+                  Trạng thái
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {(usersList.length > 0
+                ? usersList
+                : Object.values(DEMO_CREDENTIALS)
+              ).map((u, idx) => (
+                <tr
+                  key={u.email || idx}
+                  style={{
+                    borderBottom: '1px solid #f1f5f9',
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  <td
+                    style={{
+                      padding: '14px 18px',
+                      fontWeight: 700,
+                      color: '#0f172a',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background:
+                            u.role === 'ADMIN'
+                              ? '#fee2e2'
+                              : u.role === 'CHIEF_ACCOUNTANT'
+                                ? '#ede9fe'
+                                : '#e0f2fe',
+                          color:
+                            u.role === 'ADMIN'
+                              ? '#b91c1c'
+                              : u.role === 'CHIEF_ACCOUNTANT'
+                                ? '#6d28d9'
+                                : '#0369a1',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '11px',
+                          fontWeight: 800,
+                        }}
+                      >
+                        {u.fullName.slice(0, 1)}
+                      </div>
+                      <span>{u.fullName}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '14px 18px', color: '#475569' }}>
+                    <code>{u.email}</code>
+                  </td>
+                  <td style={{ padding: '14px 18px' }}>
+                    <span
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        background:
+                          u.role === 'ADMIN'
+                            ? '#fee2e2'
+                            : u.role === 'CHIEF_ACCOUNTANT'
+                              ? '#ede9fe'
+                              : '#e0f2fe',
+                        color:
+                          u.role === 'ADMIN'
+                            ? '#b91c1c'
+                            : u.role === 'CHIEF_ACCOUNTANT'
+                              ? '#6d28d9'
+                              : '#0369a1',
+                        border:
+                          u.role === 'ADMIN'
+                            ? '1px solid #fecaca'
+                            : u.role === 'CHIEF_ACCOUNTANT'
+                              ? '1px solid #ddd6fe'
+                              : '1px solid #bae6fd',
+                      }}
+                    >
+                      {u.role}
+                    </span>
+                  </td>
+                  <td style={{ padding: '14px 18px' }}>
+                    {u.role === 'ADMIN' ? (
+                      <span style={{ color: '#dc2626', fontWeight: 600 }}>
+                        🛡️ Cổng Admin (/login/admin)
+                      </span>
+                    ) : (
+                      <span style={{ color: '#059669', fontWeight: 600 }}>
+                        💼 Cổng Kế toán (/login/accountant)
+                      </span>
+                    )}
+                  </td>
+                  <td
+                    style={{
+                      padding: '14px 18px',
+                      color: '#059669',
+                      fontWeight: 700,
+                    }}
+                  >
+                    ● Hoạt động
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+
+      {/* Invoice Creation Form and Kanban Board */}
+      {(!isAdmin || activeTab === 'KANBAN') && (
+        <>
+          {/* Create Invoice Form */}
+          <form
+            onSubmit={handleCreate}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '2fr 1.2fr 1fr auto',
+              gap: '12px',
+              marginBottom: '24px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              padding: '16px 20px',
+              borderRadius: '12px',
+              alignItems: 'end',
+            }}
+          >
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: '#475569',
+                  marginBottom: '4px',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Đơn vị Mua hàng
+              </label>
+              <input
+                data-testid="input-buyer-name"
+                placeholder="Tên công ty hoặc khách hàng..."
+                value={buyerName}
+                onChange={(e) => setBuyerName(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  background: '#ffffff',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: '#475569',
+                  marginBottom: '4px',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Mã Số Thuế (MST)
+              </label>
+              <input
+                data-testid="input-tax-code"
+                placeholder="10 hoặc 13 số (VD: 0101248141)"
+                value={buyerTaxCode}
+                onChange={(e) => setBuyerTaxCode(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  background: '#ffffff',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: '#475569',
+                  marginBottom: '4px',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Tổng tiền (VNĐ)
+              </label>
+              <input
+                data-testid="input-amount"
+                type="number"
+                placeholder="Tổng tiền VNĐ"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  background: '#ffffff',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            <button
+              data-testid="btn-create-invoice"
+              type="submit"
+              style={{
+                padding: '10px 18px',
+                background: '#0f172a',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: '13px',
+                whiteSpace: 'nowrap',
+                height: '38px',
+                transition: 'background 0.2s',
+              }}
+            >
+              + Lập Hóa Đơn
+            </button>
+          </form>
+
+          {/* Kanban Board */}
+          <section
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '18px',
+            }}
+          >
+            {columns.map((col) => (
+              <div
+                key={col.key}
+                data-testid={`kanban-col-${col.key}`}
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  minHeight: '380px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                {/* Column Header */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderBottom: `2px solid ${col.color}`,
+                    paddingBottom: '10px',
+                    marginBottom: '14px',
+                  }}
+                >
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: '14px',
+                      fontWeight: 800,
+                      color: '#0f172a',
+                    }}
+                  >
+                    {col.label}
+                  </h3>
+                  <span
+                    style={{
+                      padding: '2px 8px',
+                      borderRadius: '999px',
+                      background: col.badgeBg,
+                      color: col.badgeColor,
+                      fontSize: '11px',
+                      fontWeight: 800,
+                    }}
+                  >
+                    {invoices.filter((i) => i.status === col.key).length}
+                  </span>
+                </div>
+
+                {/* Cards List */}
+                <div
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                  }}
+                >
+                  {invoices
+                    .filter((i) => i.status === col.key)
+                    .map((inv) => (
+                      <div
+                        key={inv.id}
+                        data-testid={`invoice-card-${inv.invoiceNumber}`}
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid #e2e8f0',
+                          padding: '14px 16px',
+                          borderRadius: '10px',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px',
+                        }}
+                      >
+                        {/* Invoice Number & Code */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontFamily: 'monospace',
+                              fontWeight: 800,
+                              fontSize: '13px',
+                              color: '#0f172a',
+                            }}
+                          >
+                            {inv.invoiceNumber}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              background: '#f1f5f9',
+                              color: '#475569',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontFamily: 'monospace',
+                            }}
+                          >
+                            MÃ: {inv.lookupCode}
+                          </span>
+                        </div>
+
+                        {/* Buyer Name */}
+                        <div
+                          style={{
+                            fontSize: '14px',
+                            fontWeight: 700,
+                            color: '#1e293b',
+                            lineHeight: 1.3,
+                          }}
+                        >
+                          {inv.buyerName}
+                        </div>
+
+                        {/* Buyer Tax Code */}
+                        <div style={{ fontSize: '12px', color: '#64748b' }}>
+                          MST: <b>{inv.buyerTaxCode}</b>
+                        </div>
+
+                        {/* CQT code if issued */}
+                        {inv.taxAuthorityCode && (
+                          <div
+                            style={{
+                              fontSize: '11px',
+                              color: '#059669',
+                              fontFamily: 'monospace',
+                            }}
+                          >
+                            ✓ CQT: {inv.taxAuthorityCode}
+                          </div>
+                        )}
+
+                        {/* Total Amount */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'baseline',
+                            marginTop: '4px',
+                            paddingTop: '6px',
+                            borderTop: '1px dashed #f1f5f9',
+                          }}
+                        >
+                          <span style={{ fontSize: '11px', color: '#64748b' }}>
+                            Tổng thanh toán:
+                          </span>
+                          <span
+                            style={{
+                              fontWeight: 800,
+                              fontSize: '15px',
+                              color: '#059669',
+                            }}
+                          >
+                            {inv.totalAmount.toLocaleString('vi-VN')} đ
+                          </span>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div
+                          style={{
+                            marginTop: '8px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px',
+                          }}
+                        >
+                          {col.key === 'PENDING' && (
+                            <button
+                              data-testid={`btn-issue-${inv.invoiceNumber}`}
+                              onClick={() => {
+                                if (isAccountant) {
+                                  alert(
+                                    'Chỉ Kế toán trưởng (CHIEF_ACCOUNTANT) mới có thẩm quyền ký số & duyệt phát hành hóa đơn!',
+                                  );
+                                  return;
+                                }
+                                moveStatus(inv.id, 'ISSUED');
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '7px 12px',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                background: isAccountant
+                                  ? '#94a3b8'
+                                  : '#2563eb',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: isAccountant
+                                  ? 'not-allowed'
+                                  : 'pointer',
+                                transition: 'background 0.15s',
+                              }}
+                              title={
+                                isAccountant
+                                  ? 'Chỉ Kế toán trưởng có thẩm quyền duyệt'
+                                  : 'Ký số & Phát hành'
+                              }
+                            >
+                              {isAccountant
+                                ? '⏳ Chờ KTT Ký duyệt'
+                                : 'Ký số & Phát hành (TT78) →'}
+                            </button>
+                          )}
+
+                          {col.key === 'ISSUED' && (
+                            <button
+                              data-testid={`btn-paid-${inv.invoiceNumber}`}
+                              onClick={() => moveStatus(inv.id, 'PAID')}
+                              style={{
+                                width: '100%',
+                                padding: '7px 12px',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                background: '#059669',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                transition: 'background 0.15s',
+                              }}
+                            >
+                              Xác nhận Thanh toán ✓
+                            </button>
+                          )}
+
+                          {/* Preview VAT Invoice & Print Button */}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedInvoice(inv)}
+                            style={{
+                              width: '100%',
+                              padding: '6px 10px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              background: '#f8fafc',
+                              color: '#334155',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <span>👁️ Xem Hóa đơn GTGT / In PDF</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            ))}
+          </section>
+        </>
+      )}
+
+      {/* OFFICIAL VAT INVOICE PREVIEW MODAL (Chuẩn Thông tư 78/2021/TT-BTC) */}
+      {selectedInvoice && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px',
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              maxWidth: '820px',
+              width: '100%',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {/* Modal Actions Header */}
+            <div
+              style={{
+                padding: '12px 24px',
+                background: '#0f172a',
+                color: '#ffffff',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderRadius: '16px 16px 0 0',
+              }}
+            >
+              <div style={{ fontSize: '13px', fontWeight: 700 }}>
+                BẢN THỂ HIỆN HÓA ĐƠN ĐIỆN TỬ • THÔNG TƯ 78/2021/TT-BTC
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  🖨️ In Hóa Đơn / Lưu PDF
+                </button>
+                <a
+                  href={`${API_URL}/invoices/${selectedInvoice.id}/xml`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    padding: '6px 12px',
+                    background: '#059669',
+                    color: '#ffffff',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  ⬇️ Tải XML Gốc (TT78)
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvoice(null)}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#334155',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  ✕ Đóng
+                </button>
+              </div>
+            </div>
+
+            {/* Official Invoice Sheet */}
+            <div
+              id="printable-invoice"
+              style={{
+                padding: '36px 40px',
+                color: '#0f172a',
+                fontFamily: 'serif',
+                lineHeight: 1.4,
+              }}
+            >
+              {/* Header Box */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  borderBottom: '2px solid #0f172a',
+                  paddingBottom: '16px',
+                  marginBottom: '20px',
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      fontWeight: 800,
+                      fontSize: '16px',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    CÔNG TY CỔ PHẦN CÔNG NGHỆ E-INVOICE ENTERPRISE
+                  </div>
+                  <div style={{ fontSize: '13px', marginTop: '4px' }}>
+                    Mã số thuế: <b>0108999888</b>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#475569' }}>
+                    Địa chỉ: Tòa nhà Công Nghệ FPT, Cầu Giấy, TP. Hà Nội
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#475569' }}>
+                    Điện thoại: 1900 6868 | Email: contact@einvoice.vn
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right', minWidth: '220px' }}>
+                  <div style={{ fontSize: '13px' }}>
+                    Mẫu số: <b>1C26TAA</b>
+                  </div>
+                  <div style={{ fontSize: '13px' }}>
+                    Ký hiệu: <b>C26TAA</b>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '15px',
+                      fontWeight: 800,
+                      color: '#dc2626',
+                    }}
+                  >
+                    Số: {selectedInvoice.invoiceNumber}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '11px',
+                      color: '#64748b',
+                      marginTop: '4px',
+                    }}
+                  >
+                    Mã tra cứu: <b>{selectedInvoice.lookupCode}</b>
+                  </div>
+                </div>
+              </div>
+
+              {/* Title */}
+              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: '22px',
+                    fontWeight: 900,
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  HÓA ĐƠN GIÁ TRỊ GIA TĂNG
+                </h2>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    fontStyle: 'italic',
+                    color: '#64748b',
+                    marginTop: '4px',
+                  }}
+                >
+                  (Bản thể hiện của hóa đơn điện tử khởi tạo từ hệ thống
+                  E-Invoice)
+                </div>
+                {selectedInvoice.taxAuthorityCode && (
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: '#059669',
+                      fontWeight: 700,
+                      marginTop: '6px',
+                      fontFamily: 'monospace',
+                    }}
+                  >
+                    Mã của Cơ quan Thuế: {selectedInvoice.taxAuthorityCode}
+                  </div>
+                )}
+              </div>
+
+              {/* Buyer Info */}
+              <div
+                style={{
+                  background: '#f8fafc',
+                  padding: '14px 18px',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '13px',
+                  marginBottom: '20px',
+                }}
+              >
+                <div>
+                  Đơn vị mua hàng: <b>{selectedInvoice.buyerName}</b>
+                </div>
+                <div style={{ marginTop: '4px' }}>
+                  Mã số thuế: <b>{selectedInvoice.buyerTaxCode}</b>
+                </div>
+                <div style={{ marginTop: '4px' }}>
+                  Email nhận hóa đơn:{' '}
+                  {selectedInvoice.buyerEmail || 'khachhang@company.vn'}
+                </div>
+                <div style={{ marginTop: '4px' }}>
+                  Hình thức thanh toán: <b>Chuyển khoản (CK)</b> | Đồng tiền:{' '}
+                  <b>VND</b>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '13px',
+                  marginBottom: '20px',
+                }}
+              >
+                <thead>
+                  <tr
+                    style={{
+                      background: '#f1f5f9',
+                      border: '1px solid #cbd5e1',
+                    }}
+                  >
+                    <th
+                      style={{
+                        padding: '8px',
+                        border: '1px solid #cbd5e1',
+                        width: '40px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      STT
+                    </th>
+                    <th
+                      style={{
+                        padding: '8px',
+                        border: '1px solid #cbd5e1',
+                        textAlign: 'left',
+                      }}
+                    >
+                      Tên hàng hóa, dịch vụ
+                    </th>
+                    <th
+                      style={{
+                        padding: '8px',
+                        border: '1px solid #cbd5e1',
+                        width: '70px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      ĐVT
+                    </th>
+                    <th
+                      style={{
+                        padding: '8px',
+                        border: '1px solid #cbd5e1',
+                        width: '60px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      Số lượng
+                    </th>
+                    <th
+                      style={{
+                        padding: '8px',
+                        border: '1px solid #cbd5e1',
+                        width: '110px',
+                        textAlign: 'right',
+                      }}
+                    >
+                      Đơn giá
+                    </th>
+                    <th
+                      style={{
+                        padding: '8px',
+                        border: '1px solid #cbd5e1',
+                        width: '120px',
+                        textAlign: 'right',
+                      }}
+                    >
+                      Thành tiền
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td
+                      style={{
+                        padding: '10px 8px',
+                        border: '1px solid #cbd5e1',
+                        textAlign: 'center',
+                      }}
+                    >
+                      1
+                    </td>
+                    <td
+                      style={{
+                        padding: '10px 8px',
+                        border: '1px solid #cbd5e1',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Dịch vụ Hóa đơn điện tử E-Invoice Enterprise
+                    </td>
+                    <td
+                      style={{
+                        padding: '10px 8px',
+                        border: '1px solid #cbd5e1',
+                        textAlign: 'center',
+                      }}
+                    >
+                      Gói
+                    </td>
+                    <td
+                      style={{
+                        padding: '10px 8px',
+                        border: '1px solid #cbd5e1',
+                        textAlign: 'center',
+                      }}
+                    >
+                      1
+                    </td>
+                    <td
+                      style={{
+                        padding: '10px 8px',
+                        border: '1px solid #cbd5e1',
+                        textAlign: 'right',
+                      }}
+                    >
+                      {(
+                        selectedInvoice.subTotal ||
+                        Math.round(selectedInvoice.totalAmount / 1.08)
+                      ).toLocaleString('vi-VN')}
+                    </td>
+                    <td
+                      style={{
+                        padding: '10px 8px',
+                        border: '1px solid #cbd5e1',
+                        textAlign: 'right',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {(
+                        selectedInvoice.subTotal ||
+                        Math.round(selectedInvoice.totalAmount / 1.08)
+                      ).toLocaleString('vi-VN')}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Total Calculation */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  fontSize: '13px',
+                  borderTop: '2px solid #0f172a',
+                  paddingTop: '12px',
+                  marginBottom: '20px',
+                }}
+              >
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between' }}
+                >
+                  <span>Cộng tiền hàng (tiền trước thuế):</span>
+                  <b>
+                    {(
+                      selectedInvoice.subTotal ||
+                      Math.round(selectedInvoice.totalAmount / 1.08)
+                    ).toLocaleString('vi-VN')}{' '}
+                    VND
+                  </b>
+                </div>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between' }}
+                >
+                  <span>
+                    Thuế suất GTGT: <b>8%</b> | Tiền thuế GTGT:
+                  </span>
+                  <b>
+                    {(
+                      selectedInvoice.vatAmount ||
+                      selectedInvoice.totalAmount -
+                        Math.round(selectedInvoice.totalAmount / 1.08)
+                    ).toLocaleString('vi-VN')}{' '}
+                    VND
+                  </b>
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: '16px',
+                    fontWeight: 900,
+                    color: '#0f172a',
+                    borderTop: '1px solid #e2e8f0',
+                    paddingTop: '8px',
+                  }}
+                >
+                  <span>Tổng cộng tiền thanh toán:</span>
+                  <span style={{ color: '#16a34a' }}>
+                    {selectedInvoice.totalAmount.toLocaleString('vi-VN')} VND
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: '13px',
+                    fontStyle: 'italic',
+                    marginTop: '4px',
+                  }}
+                >
+                  Số tiền viết bằng chữ:{' '}
+                  <b>{numberToVietnameseWords(selectedInvoice.totalAmount)}</b>
+                </div>
+              </div>
+
+              {/* Signatures Footer */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '20px',
+                  marginTop: '32px',
+                  textAlign: 'center',
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Người mua hàng
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>
+                    (Ký, ghi rõ họ tên)
+                  </div>
+                </div>
+
+                <div>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Người bán hàng
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>
+                    (Ký số điện tử)
+                  </div>
+
+                  {/* Stamp Digital Signature Box */}
+                  {selectedInvoice.status !== 'PENDING' ? (
+                    <div
+                      style={{
+                        margin: '16px auto 0',
+                        maxWidth: '260px',
+                        border: '2px solid #dc2626',
+                        borderRadius: '8px',
+                        padding: '10px',
+                        color: '#dc2626',
+                        fontSize: '11px',
+                        lineHeight: 1.3,
+                        textAlign: 'left',
+                        background: '#fef2f2',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontWeight: 900,
+                          textTransform: 'uppercase',
+                          textAlign: 'center',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        ✓ KÝ SỐ ĐIỆN TỬ HỢP LỆ
+                      </div>
+                      <div>
+                        Được ký bởi:{' '}
+                        <b>
+                          {selectedInvoice.signedBy ||
+                            'Nguyễn Văn A (Kế toán trưởng)'}
+                        </b>
+                      </div>
+                      <div>
+                        Cơ quan: <b>CÔNG TY CP CÔNG NGHỆ E-INVOICE</b>
+                      </div>
+                      <div>
+                        Ngày ký:{' '}
+                        {selectedInvoice.signedAt
+                          ? new Date(
+                              selectedInvoice.signedAt,
+                            ).toLocaleDateString('vi-VN')
+                          : '10/11/2026'}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '10px',
+                          color: '#991b1b',
+                          marginTop: '2px',
+                        }}
+                      >
+                        Chứng thư số Viettel-CA / SHA-256
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        marginTop: '20px',
+                        fontSize: '12px',
+                        color: '#d97706',
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      (Chưa ký số - Chờ Kế toán trưởng phê duyệt)
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }

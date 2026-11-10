@@ -60,5 +60,13 @@
         "linter": "eslint"
       }
     }
+  },
+  "targetDefaults": {
+    "test": {
+      "cache": true,
+      "options": {
+        "passWithNoTests": true
+      }
+    }
   }
 }

@@ -6,12 +6,14 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
+import { MICROSERVICE_PORTS } from '@e-invoice/constants';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
-  const port = process.env.PORT || 3000;
+  app.enableCors();
+  const port = process.env.PORT || MICROSERVICE_PORTS.BFF;
   await app.listen(port);
   // Set when Nx waits for this server to be ready
   if (process.env.NX_READY_SIGNAL_SOCKET) {
