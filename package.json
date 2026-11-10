@@ -2,14 +2,29 @@
   "name": "@e-invoice/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "prepare": "husky"
+  },
   "private": true,
   "dependencies": {},
   "devDependencies": {
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
+    "@nx/eslint": "^24.0.5",
     "@nx/js": "24.0.5",
+    "@nx/nest": "^24.0.5",
+    "@nx/next": "^24.0.5",
     "@nx/workspace": "24.0.5",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
     "nx": "24.0.5",
+    "prettier": "^3.9.10",
     "typescript": "~6.0.3"
   },
-  "packageManager": "pnpm@12.18.0"
+  "packageManager": "pnpm@12.18.0",
+  "lint-staged": {
+    "*.{ts,tsx,js,json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
 }

@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  einvoice-mongodb:
+    image: mongo:7.0
+    container_name: einvoice-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: einvoice_db
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - einvoice-nw
+
+  einvoice-postgres:
+    image: postgres:16-alpine
+    container_name: einvoice-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: einvoice_user_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - einvoice-nw
+
+  einvoice-redis:
+    image: redis:7.2-alpine
+    container_name: einvoice-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - einvoice-nw
+
+volumes:
+  mongodb_data:
+  postgres_data:
+
+networks:
+  einvoice-nw:
+    driver: bridge
+    name: einvoice-nw
