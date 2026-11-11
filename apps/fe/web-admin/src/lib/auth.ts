@@ -58,7 +58,17 @@ export function clearStoredUser(): void {
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(TOKEN_KEY);
 }
-
+export function getStoredToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+export function getAuthHeaders(): Record<string, string> {
+  const token = getStoredToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 export async function loginUser(
   email: string,
   portalType: 'ADMIN' | 'ACCOUNTANT',

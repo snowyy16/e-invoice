@@ -6,10 +6,13 @@ import {
   Param,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { AppService } from './app.service';
-import { InvoiceStatus } from '@e-invoice/constants';
+import { InvoiceStatus, UserRole } from '@e-invoice/constants';
 import { IInvoiceItem } from '@e-invoice/interfaces';
+import { Roles } from '@e-invoice/decorators';
+import { JwtAuthGuard, RolesGuard } from '@e-invoice/guards';
 
 @Controller()
 export class AppController {
@@ -50,6 +53,8 @@ export class AppController {
   }
 
   @Get('users')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   getUsers() {
     return this.appService.getUsers();
   }
@@ -68,6 +73,8 @@ export class AppController {
   }
 
   @Patch('invoices/:id/status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CHIEF_ACCOUNTANT, UserRole.ADMIN)
   updateStatus(
     @Param('id') id: string,
     @Body('status') status: InvoiceStatus,
