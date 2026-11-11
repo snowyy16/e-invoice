@@ -17,6 +17,7 @@ import {
   generateTaxAuthorityCode,
   generateInvoiceXml,
   isValidVietnamTaxCode,
+  signJwtToken,
 } from '@e-invoice/utils';
 import { InvoiceDocument } from '@e-invoice/schemas';
 import { UserEntity } from '@e-invoice/entities';
@@ -200,6 +201,12 @@ export class AppService implements OnModuleInit {
         'Tài khoản Quản trị viên (ADMIN) vui lòng đăng nhập qua Cổng Quản trị viên!',
       );
     }
+    const token = signJwtToken({
+      sub: String(user.id),
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+    });
 
     return {
       success: true,
@@ -210,7 +217,7 @@ export class AppService implements OnModuleInit {
         fullName: user.fullName,
         role: user.role,
       },
-      token: `jwt-mock-${user.role.toLowerCase()}-${Date.now()}`,
+      token,
     };
   }
 
