@@ -67,7 +67,8 @@ jobs:
 
       - name: 2.3. Unit Testing & Code Coverage
         run: |
-          pnpm test:coverage || { echo '=== DETAILED TEST FAILURE ==='; pnpm nx test bff --verbose; exit 1; }
+          pnpm nx test bff --output-style=static
+          pnpm nx test utils --output-style=static
 
       - name: Upload Test Coverage Artifacts
         uses: actions/upload-artifact@v4
