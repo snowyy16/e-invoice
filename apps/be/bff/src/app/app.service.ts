@@ -111,13 +111,6 @@ export class AppService {
       role: user.role,
     });
 
-    const token = signJwtToken({
-      sub: user.id,
-      email: user.email,
-      fullName: user.fullName,
-      role: user.role,
-    });
-
     return {
       success: true,
       message: 'Đăng nhập thành công',
