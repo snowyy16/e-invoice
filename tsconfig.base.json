@@ -15,14 +15,11 @@
     "skipDefaultLibCheck": true,
     "strict": false,
     "paths": {
-      "@e-invoice/configuration": ["./libs/configuration/src/index.ts"],
       "@e-invoice/constants": ["./libs/constants/src/index.ts"],
       "@e-invoice/decorators": ["./libs/decorators/src/index.ts"],
       "@e-invoice/entities": ["./libs/entities/src/index.ts"],
       "@e-invoice/guards": ["./libs/guards/src/index.ts"],
-      "@e-invoice/interceptors": ["./libs/interceptors/src/index.ts"],
       "@e-invoice/interfaces": ["./libs/interfaces/src/index.ts"],
-      "@e-invoice/middlewares": ["./libs/middlewares/src/index.ts"],
       "@e-invoice/schemas": ["./libs/schemas/src/index.ts"],
       "@e-invoice/utils": ["./libs/utils/src/index.ts"]
     }
