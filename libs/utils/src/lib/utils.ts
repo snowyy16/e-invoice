@@ -1,5 +1,5 @@
 import { IInvoiceCalculation, IInvoiceItem } from '@e-invoice/interfaces';
-
+import * as crypto from 'crypto';
 /**
  * Tính toán tổng tiền trước thuế, tiền thuế VAT và tổng thanh toán của hóa đơn
  */
@@ -232,4 +232,74 @@ export function numberToVietnameseWords(n: number): string {
   const result =
     str.charAt(0).toUpperCase() + str.slice(1).trim() + ' đồng chẵn';
   return result.replace(/\s+/g, ' ');
+}
+export interface IJwtPayload {
+  sub: string;
+  email: string;
+  fullName: string;
+  role: string;
+  iat?: number;
+  exp?: number;
+}
+
+// Đọc secret lúc cần dùng (không đọc lúc import) và KHÔNG có giá trị mặc định:
+// repo này công khai, secret mặc định trong code thì ai cũng giả mạo được token.
+function getJwtSecret(): string {
+  const secret = process.env['JWT_SECRET'];
+  if (!secret) {
+    throw new Error('JWT_SECRET chưa được cấu hình');
+  }
+  return secret;
+}
+
+export function signJwtToken(
+  payload: Omit<IJwtPayload, 'iat' | 'exp'>,
+  expiresInSeconds = 8 * 3600, // Hết hạn sau 8 giờ
+): string {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+  const fullPayload: IJwtPayload = {
+    ...payload,
+    iat: now,
+    exp: now + expiresInSeconds,
+  };
+
+  const base64Header = Buffer.from(JSON.stringify(header)).toString(
+    'base64url',
+  );
+  const base64Payload = Buffer.from(JSON.stringify(fullPayload)).toString(
+    'base64url',
+  );
+  const signature = crypto
+    .createHmac('sha256', getJwtSecret())
+    .update(`${base64Header}.${base64Payload}`)
+    .digest('base64url');
+
+  return `${base64Header}.${base64Payload}.${signature}`;
+}
+
+export function verifyJwtToken(token: string): IJwtPayload | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const [base64Header, base64Payload, signature] = parts;
+
+    const expectedSig = crypto
+      .createHmac('sha256', getJwtSecret())
+      .update(`${base64Header}.${base64Payload}`)
+      .digest('base64url');
+
+    if (signature !== expectedSig) return null;
+
+    const payload: IJwtPayload = JSON.parse(
+      Buffer.from(base64Payload, 'base64url').toString('utf8'),
+    );
+
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) return null;
+
+    return payload;
+  } catch {
+    return null;
+  }
 }

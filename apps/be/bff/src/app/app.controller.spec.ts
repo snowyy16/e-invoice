@@ -1,4 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import { InvoiceEntity, UserEntity } from '@e-invoice/entities';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -8,14 +11,24 @@ describe('AppController', () => {
   beforeAll(async () => {
     app = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [AppService],
+      providers: [
+        AppService,
+        // Database giả: test chạy không cần PostgreSQL.
+        {
+          provide: DataSource,
+          useValue: { query: jest.fn().mockResolvedValue([]) },
+        },
+        { provide: getRepositoryToken(UserEntity), useValue: {} },
+        { provide: getRepositoryToken(InvoiceEntity), useValue: {} },
+      ],
     }).compile();
   });
 
   describe('getHealth', () => {
-    it('should return status ok', () => {
+    it('should return status ok', async () => {
       const appController = app.get<AppController>(AppController);
-      expect(appController.getHealth().status).toEqual('ok');
+      const health = await appController.getHealth();
+      expect(health.status).toEqual('ok');
     });
   });
 });
