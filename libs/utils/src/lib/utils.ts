@@ -242,8 +242,9 @@ export interface IJwtPayload {
   exp?: number;
 }
 
-const JWT_SECRET =
-  process.env['JWT_SECRET'] || 'einvoice-enterprise-secret-2026';
+function getJwtSecret(): string {
+  return process.env['JWT_SECRET'] || 'einvoice-enterprise-secret-2026';
+}
 
 export function signJwtToken(
   payload: Omit<IJwtPayload, 'iat' | 'exp'>,
@@ -264,7 +265,7 @@ export function signJwtToken(
     'base64url',
   );
   const signature = crypto
-    .createHmac('sha256', JWT_SECRET)
+    .createHmac('sha256', getJwtSecret())
     .update(`${base64Header}.${base64Payload}`)
     .digest('base64url');
 
@@ -278,7 +279,7 @@ export function verifyJwtToken(token: string): IJwtPayload | null {
     const [base64Header, base64Payload, signature] = parts;
 
     const expectedSig = crypto
-      .createHmac('sha256', JWT_SECRET)
+      .createHmac('sha256', getJwtSecret())
       .update(`${base64Header}.${base64Payload}`)
       .digest('base64url');
 

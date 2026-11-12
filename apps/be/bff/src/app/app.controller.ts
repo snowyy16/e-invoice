@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { AppService } from './app.service';
@@ -28,11 +29,11 @@ export class AppController {
     @Body()
     body: {
       email: string;
-      password?: string;
+      password: string;
       portalType?: 'ADMIN' | 'ACCOUNTANT';
     },
   ) {
-    return this.appService.login(body.email, body.portalType);
+    return this.appService.login(body.email, body.password, body.portalType);
   }
 
   @Get('invoices')
@@ -78,13 +79,9 @@ export class AppController {
   updateStatus(
     @Param('id') id: string,
     @Body('status') status: InvoiceStatus,
-    @Body('signedBy') signedBy?: string,
+    // Người ký lấy từ token đã xác thực, không nhận từ body để tránh giả mạo người ký.
+    @Req() req: { user?: { fullName?: string } },
   ) {
-    return this.appService.updateStatus(id, status, signedBy);
-  }
-
-  @Post('invoices/ai-extract')
-  extractWithAI(@Body('rawText') rawText: string) {
-    return this.appService.extractInvoiceWithAI(rawText);
+    return this.appService.updateStatus(id, status, req.user?.fullName);
   }
 }
