@@ -2,9 +2,9 @@ name: DevSecOps CI/CD Pipeline
 
 on:
   push:
-    branches: [main, refactor/simplify]
+    branches: [main, dev, refactor/simplify]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
 
 permissions:
