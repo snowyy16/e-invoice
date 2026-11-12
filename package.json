@@ -6,7 +6,7 @@
     "dev": "nx run-many -t dev -p web-admin web-portal",
     "dev:all": "nx run-many -t serve dev -p bff web-admin web-portal",
     "build": "nx run-many -t build",
-    "test": "nx run-many -t test --exclude=invoice-e2e",
+    "test": "nx run-many -t test --passWithNoTests",
     "lint": "nx run-many -t lint"
   },
   "private": true,
