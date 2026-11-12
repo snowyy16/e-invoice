@@ -1,3 +1,4 @@
+/// <reference types="node" />
 module.exports = {
   displayName: 'decorators',
   preset: '../../jest.preset.js',

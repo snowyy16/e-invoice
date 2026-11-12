@@ -14,6 +14,7 @@
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "strict": false,
+    "types": ["node", "jest"],
     "paths": {
       "@e-invoice/constants": ["./libs/constants/src/index.ts"],
       "@e-invoice/decorators": ["./libs/decorators/src/index.ts"],

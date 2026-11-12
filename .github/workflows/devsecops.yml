@@ -67,26 +67,8 @@ jobs:
 
       - name: 2.3. Unit Testing & Code Coverage
         run: |
-          set +e
-          echo "### Test Execution Results" >> $GITHUB_STEP_SUMMARY
-
-          pnpm nx test bff --coverage 2>&1 | tee bff.log
-          BFF_STATUS=${PIPESTATUS[0]}
-          echo "BFF Exit Code: $BFF_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -n 35 bff.log >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-          pnpm nx test utils --coverage 2>&1 | tee utils.log
-          UTILS_STATUS=${PIPESTATUS[0]}
-          echo "Utils Exit Code: $UTILS_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -n 25 utils.log >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-          if [ $BFF_STATUS -ne 0 ] || [ $UTILS_STATUS -ne 0 ]; then
-            exit 1
-          fi
+          pnpm nx test bff --coverage
+          pnpm nx test utils --coverage
 
       - name: Upload Test Coverage Artifacts
         uses: actions/upload-artifact@v4

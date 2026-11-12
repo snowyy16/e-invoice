@@ -1,3 +1,4 @@
+/// <reference types="node" />
 module.exports = {
   displayName: 'schemas',
   preset: '../../jest.preset.js',
