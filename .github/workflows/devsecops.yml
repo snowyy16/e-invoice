@@ -23,6 +23,10 @@ jobs:
   ci-build-and-test:
     name: 2. CI Automation (Build, Health Check & Tests)
     runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: 'einvoice-enterprise-secret-jwt-key-32-chars-long'
+      DATABASE_URL: 'postgresql://admin:password123@localhost:5432/einvoice_test_db'
+      NODE_ENV: test
 
     steps:
       - name: 1. Source Code Management (Checkout)
@@ -62,7 +66,8 @@ jobs:
         run: pnpm nx build bff
 
       - name: 2.3. Unit Testing & Code Coverage
-        run: pnpm test:coverage
+        run: |
+          pnpm test:coverage || { echo '=== DETAILED TEST FAILURE ==='; pnpm nx test bff --verbose; exit 1; }
 
       - name: Upload Test Coverage Artifacts
         uses: actions/upload-artifact@v4
