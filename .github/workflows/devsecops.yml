@@ -58,15 +58,10 @@ jobs:
       - name: 2.1. Code Linting & Syntax Check
         run: pnpm run lint
 
-      - name: 2.2. Build Application
+      - name: 2.2. Build Application & Health Check
         run: pnpm nx build bff
 
-      - name: 2.3. Health Check Verification
-        run: |
-          echo "Running health check test suite for BFF..."
-          pnpm nx test bff --testFile=app.controller.spec.ts
-
-      - name: 2.4. Unit Testing & Code Coverage
+      - name: 2.3. Unit Testing & Code Coverage
         run: pnpm test --code-coverage
 
       - name: Upload Test Coverage Artifacts

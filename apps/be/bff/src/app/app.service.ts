@@ -104,6 +104,12 @@ export class AppService {
         'Tài khoản Quản trị viên (ADMIN) vui lòng đăng nhập qua Cổng Quản trị viên!',
       );
     }
+    const token = signJwtToken({
+      sub: String(user.id),
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+    });
 
     const token = signJwtToken({
       sub: user.id,

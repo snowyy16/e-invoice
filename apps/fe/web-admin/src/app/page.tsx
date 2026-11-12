@@ -7,6 +7,8 @@ import {
   getStoredUser,
   clearStoredUser,
   setStoredUser,
+  getAuthHeaders,
+  loginUser,
   DEMO_CREDENTIALS,
 } from '../lib/auth';
 import { numberToVietnameseWords } from '@e-invoice/utils';
@@ -97,7 +99,7 @@ export default function AdminDashboardPage() {
         console.warn('Invoices fetch fallback:', err);
       });
 
-    fetch(`${API_URL}/users`)
+    fetch(`${API_URL}/users`, { headers: getAuthHeaders() })
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setUsersList(data);
@@ -112,18 +114,24 @@ export default function AdminDashboardPage() {
     setCurrentUser(null);
   };
 
-  const handleSwitchDemoUser = (
+  const handleSwitchDemoUser = async (
     roleKey: 'ADMIN' | 'CHIEF_ACCOUNTANT' | 'ACCOUNTANT',
   ) => {
     const cred = DEMO_CREDENTIALS[roleKey];
-    const newUser: AuthUser = {
-      id: `demo-${roleKey.toLowerCase()}`,
-      email: cred.email,
-      fullName: cred.fullName,
-      role: cred.role,
-    };
-    setStoredUser(newUser);
-    setCurrentUser(newUser);
+    const portalType = roleKey === 'ADMIN' ? 'ADMIN' : 'ACCOUNTANT';
+    try {
+      const { user } = await loginUser(cred.email, portalType, cred.password);
+      setCurrentUser(user);
+    } catch {
+      const newUser: AuthUser = {
+        id: `demo-${roleKey.toLowerCase()}`,
+        email: cred.email,
+        fullName: cred.fullName,
+        role: cred.role,
+      };
+      setStoredUser(newUser);
+      setCurrentUser(newUser);
+    }
   };
 
   const moveStatus = (id: string, nextStatus: Status) => {
@@ -152,7 +160,7 @@ export default function AdminDashboardPage() {
 
     fetch(`${API_URL}/invoices/${id}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         status: nextStatus,
         signedBy: signer,
