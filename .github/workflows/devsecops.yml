@@ -21,7 +21,7 @@ jobs:
   # 1. CI (AUTOMATION): BUILD, HEALTH CHECK, TEST & COVERAGE
   # ===============================================================
   ci-build-and-test:
-    name: 1. CI Automation (Build, Health Check & Tests)
+    name: 2. CI Automation (Build, Health Check & Tests)
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: 'einvoice-enterprise-secret-jwt-key-32-chars-long'
