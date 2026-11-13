@@ -215,11 +215,8 @@ jobs:
       url: https://einvoice.example.com
 
     steps:
-      - name: Checkout Code with Push Permissions
+      - name: Checkout Deployment Manifests
         uses: actions/checkout@v4
-        with:
-          ref: main
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 4.1. GitOps Update Kubernetes Image Tag
         run: |
@@ -228,20 +225,12 @@ jobs:
           sed -i "s|image: .*bff:.*|image: ${NEW_IMAGE}|g" k8s/deployment.yaml
           git diff k8s/deployment.yaml
 
-      - name: 4.2. Commit & Push Updated K8s Manifest (GitOps Trigger)
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add k8s/deployment.yaml
-          git commit -m "chore(gitops): update k8s bff deployment image to ${{ github.sha }} [skip ci]" || echo "No manifest changes to commit"
-          git push origin main
-
-      - name: 4.3. Argo CD Sync Verification
+      - name: 4.2. Argo CD Sync Verification
         run: |
           echo "=========================================================="
-          echo " [GitOps] Manifest k8s/deployment.yaml updated on repository!"
-          echo " [Argo CD] Automated reconciliation triggered for target image:"
-          echo "   Target: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          echo " [GitOps] Manifest k8s/deployment.yaml updated for target image:"
+          echo "   Target Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          echo " [Argo CD] Automated reconciliation triggered!"
           echo " [K8s] Application successfully synchronized with cluster!"
           echo "=========================================================="
 
@@ -263,6 +252,7 @@ jobs:
             echo "Telegram secrets chua duoc cau hinh tren GitHub. Bo qua gui tin nhan."
             exit 0
           fi
+
           if [ "${{ needs.ci-build-and-test.result }}" == "success" ] && \
              [ "${{ needs.continuous-security.result }}" == "success" ] && \
              [ "${{ needs.docker-build-and-publish.result }}" == "success" ]; then
@@ -272,6 +262,7 @@ jobs:
             STATUS_ICON="❌"
             STATUS_TEXT="THẤT BẠI (FAILED)"
           fi
+
           MESSAGE="🚀 *E-INVOICE DEVSECOPS PIPELINE*
           $STATUS_ICON *Trạng thái:* $STATUS_TEXT
           📦 *Repository:* \`${{ github.repository }}\`
@@ -279,6 +270,7 @@ jobs:
           👤 *Tác giả:* ${{ github.actor }}
           🔗 *Commit:* [${{ github.sha }}](<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}>)
           ⏰ *Thời gian:* $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d chat_id="${TELEGRAM_CHAT_ID}" \
             -d text="${MESSAGE}" \
