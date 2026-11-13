@@ -211,9 +211,27 @@ export default function AdminDashboardPage() {
           },
         ],
       }),
-    }).catch((err) => {
-      console.warn('Invoice create API error:', err);
-    });
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((savedInv) => {
+        if (savedInv?.id) {
+          setInvoices((prev) =>
+            prev.map((item) =>
+              item.id === newInvoice.id
+                ? {
+                    ...item,
+                    id: savedInv.id,
+                    invoiceNumber: savedInv.invoiceNumber,
+                    lookupCode: savedInv.lookupCode,
+                  }
+                : item,
+            ),
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn('Invoice create API error:', err);
+      });
   };
 
   const totalRevenue = invoices.reduce((sum, i) => sum + i.totalAmount, 0);
