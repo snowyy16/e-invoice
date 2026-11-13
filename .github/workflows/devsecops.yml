@@ -2,7 +2,7 @@ name: DevSecOps CI/CD Pipeline
 
 on:
   push:
-    branches: [main, dev, refactor/simplify]
+    branches: [main]
   pull_request:
     branches: [main, dev]
   workflow_dispatch:
@@ -18,10 +18,10 @@ env:
 
 jobs:
   # ===============================================================
-  # 1 & 2. CI (AUTOMATION): BUILD, HEALTH CHECK, TEST & COVERAGE
+  # 1. CI (AUTOMATION): BUILD, HEALTH CHECK, TEST & COVERAGE
   # ===============================================================
   ci-build-and-test:
-    name: 2. CI Automation (Build, Health Check & Tests)
+    name: 1. CI Automation (Build, Health Check & Tests)
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: 'einvoice-enterprise-secret-jwt-key-32-chars-long'
@@ -29,7 +29,7 @@ jobs:
       NODE_ENV: test
 
     steps:
-      - name: 1. Source Code Management (Checkout)
+      - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -59,13 +59,13 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: 2.1. Code Linting & Syntax Check
+      - name: 1.1. Code Linting & Syntax Check
         run: pnpm run lint
 
-      - name: 2.2. Build Application & Health Check
+      - name: 1.2. Build Application & Health Check
         run: pnpm nx build bff
 
-      - name: 2.3. Unit Testing & Code Coverage
+      - name: 1.3. Unit Testing & Code Coverage
         run: |
           pnpm nx test bff --coverage
           pnpm nx test utils --coverage
@@ -79,10 +79,10 @@ jobs:
           retention-days: 7
 
   # ===============================================================
-  # 3. CONTINUOUS SECURITY: SAST, SCA, SECRETS & SECURITY GATES
+  # 2. CONTINUOUS SECURITY: SAST, SCA, SECRETS & SECURITY GATES
   # ===============================================================
   continuous-security:
-    name: 3. Continuous Security (Gitleaks, Audit, Trivy & Sonar)
+    name: 2. Continuous Security (Gitleaks, Audit, Trivy & Sonar)
     needs: ci-build-and-test
     runs-on: ubuntu-latest
 
@@ -92,21 +92,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      # --- 3.1. SECRET DETECTION (GITLEAKS - giống cicd-demo) ---
-      - name: 3.1. Secret Detection (Gitleaks)
+      # --- 2.1. SECRET DETECTION (GITLEAKS) ---
+      - name: 2.1. Secret Detection (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
-      # --- 3.2. DEPENDENCY AUDIT (SCA - giống cicd-demo) ---
-      - name: 3.2. Dependency Vulnerability Audit
+      # --- 2.2. DEPENDENCY AUDIT (SCA) ---
+      - name: 2.2. Dependency Vulnerability Audit
         run: |
           echo "Scanning dependencies with pnpm audit..."
           pnpm audit --audit-level=high || echo "::warning::Pnpm audit detected vulnerabilities. Review security report."
 
-      # --- 3.3. TRIVY FILESYSTEM & DEPENDENCY SCAN ---
-      - name: 3.3. Trivy Filesystem & Dependency Scan
+      # --- 2.3. TRIVY FILESYSTEM & DEPENDENCY SCAN ---
+      - name: 2.3. Trivy Filesystem & Dependency Scan
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
@@ -121,16 +121,16 @@ jobs:
             cat trivy-fs-report.txt
           fi
 
-      # --- 3.4. SONARQUBE / SONARCLOUD CODE QUALITY ANALYSIS ---
-      - name: 3.4. SonarQube Code Quality Analysis
+      # --- 2.4. SONARQUBE / SONARCLOUD CODE QUALITY ANALYSIS ---
+      - name: 2.4. SonarQube Code Quality Analysis
         uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         continue-on-error: true
 
-      # --- 3.5. SECURITY GATES: LƯU BÁO CÁO BẢO MẬT ---
-      - name: Upload Security Reports (Nexus / Artifact Stand-in)
+      # --- 2.5. SECURITY GATES: LƯU BÁO CÁO BẢO MẬT ---
+      - name: 2.5. Upload Security Reports (Nexus / Artifact Stand-in)
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -139,10 +139,10 @@ jobs:
           retention-days: 7
 
   # ===============================================================
-  # 4. ARTIFACT MANAGEMENT: DOCKER BUILD, IMAGE SCAN & PUSH GHCR
+  # 3. ARTIFACT MANAGEMENT: DOCKER BUILD, IMAGE SCAN & PUSH GHCR
   # ===============================================================
   docker-build-and-publish:
-    name: 4. Artifact Management (Docker & GHCR)
+    name: 3. Artifact Management (Docker & GHCR)
     needs: continuous-security
     runs-on: ubuntu-latest
 
@@ -201,10 +201,10 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   # ===============================================================
-  # 5 & 6. CD (DEPLOYMENT) & RUNTIME PLATFORM (ARGOCD & KUBERNETES)
+  # 4. CD (DEPLOYMENT) & RUNTIME PLATFORM (ARGOCD & KUBERNETES)
   # ===============================================================
   cd-deployment:
-    name: 5. CD Deployment (Approval & Argo CD)
+    name: 4. CD Deployment (Approval & Argo CD)
     needs: docker-build-and-publish
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
