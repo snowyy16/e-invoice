@@ -48,6 +48,10 @@ Thumbs.db
 .next
 out
 
+# env & scratch
+.env*
+scratch_health.js
+
 #agent
 .agent
 .agents
