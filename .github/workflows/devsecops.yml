@@ -247,6 +247,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RAW_COMMIT_MSG: ${{ github.event.head_commit.message || github.event.pull_request.title || 'N/A' }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
             echo "Telegram secrets chua duoc cau hinh tren GitHub. Bo qua gui tin nhan."
@@ -263,12 +264,18 @@ jobs:
             STATUS_TEXT="THẤT BẠI (FAILED)"
           fi
 
+          # Lay dong dau tien va loai bo ky tu gay loi dinh dang Telegram Markdown
+          CLEAN_MSG=$(echo "$RAW_COMMIT_MSG" | head -n 1 | sed 's/[*_`\\]//g')
+          FULL_SHA="${{ github.sha }}"
+          SHORT_SHA="${FULL_SHA:0:7}"
+
           MESSAGE="🚀 *E-INVOICE DEVSECOPS PIPELINE*
           $STATUS_ICON *Trạng thái:* $STATUS_TEXT
           📦 *Repository:* \`${{ github.repository }}\`
           🌿 *Nhánh:* \`${{ github.ref_name }}\`
           👤 *Tác giả:* ${{ github.actor }}
-          🔗 *Commit:* [${{ github.sha }}](<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}>)
+          🔗 *Commit:* [$SHORT_SHA](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+          📝 *Nội dung:* $CLEAN_MSG
           ⏰ *Thời gian:* $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
