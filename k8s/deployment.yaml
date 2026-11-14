@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: bff
-          image: ghcr.io/einvoice/bff:latest
+          image: ghcr.io/snowyy16/e-invoice/bff:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
@@ -24,9 +24,21 @@ spec:
             - name: NODE_ENV
               value: 'production'
             - name: DATABASE_URL
-              value: 'postgresql://admin:password123@einvoice-postgres:5432/einvoice_user_db'
+              valueFrom:
+                secretKeyRef:
+                  name: einvoice-secrets
+                  key: DATABASE_URL
             - name: JWT_SECRET
-              value: 'super_secret_jwt_key_at_least_32_characters_long'
+              valueFrom:
+                secretKeyRef:
+                  name: einvoice-secrets
+                  key: JWT_SECRET
+            - name: DB_SYNCHRONIZE
+              value: 'true'
+            - name: SEED_DATA
+              value: 'true'
+            - name: SEED_PASSWORD
+              value: 'Password123!'
           resources:
             requests:
               memory: '128Mi'
