@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: bff
-          image: ghcr.io/snowyy16/e-invoice/bff:latest
+          image: ghcr.io/snowyy16/e-invoice/bff:44b9e7e8d5abb3d835f3a6d01cd2504a05368032
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
