@@ -29,7 +29,7 @@ flowchart TB
     end
 
     subgraph CD_GITOPS["🚀 4. Continuous Deployment & GitOps (Kubernetes)"]
-        E --> F["Job 4: Production Approval Gate<br/>Cập nhật k8s/deployment.yaml ➔ nhánh gitops<br/>+ OWASP ZAP DAST Scan"]
+        E --> F["Job 4: Production Approval Gate<br/>Cập nhật k8s/deployment.yaml ➔ nhánh gitops"]
         F --> G["Argo CD Controller<br/>Tự động Sync từ nhánh gitops vào K8s Cluster"]
         G --> H["Kubernetes Namespace: default<br/>• einvoice-bff (2 Pods HA)<br/>• einvoice-postgres (1 Pod + 1Gi PVC)<br/>• einvoice-secrets (Opaque Secret)"]
     end
@@ -68,14 +68,14 @@ e-invoice/
 
 ## 🛠️ Công nghệ Sử dụng (Tech Stack)
 
-| Tầng (Layer)            | Công nghệ / Công cụ                                            | Vai trò trong hệ thống                                                                             |
-| :---------------------- | :------------------------------------------------------------- | :------------------------------------------------------------------------------------------------- |
-| **Ứng dụng & CSDL**     | NestJS, React, TypeScript, Prisma, PostgreSQL 16               | Xử lý nghiệp vụ hóa đơn điện tử, ký số XML và lưu trữ dữ liệu                                      |
-| **CI & Build**          | Nx Workspace, pnpm, GitHub Actions                             | Tự động hóa kiểm tra cú pháp, biên dịch và kiểm thử                                                |
-| **Bảo mật (DevSecOps)** | Gitleaks, `pnpm audit`, SonarQube Cloud, Aqua Trivy, OWASP ZAP | Quét Secret, lỗ hổng thư viện (SCA), mã nguồn tĩnh (SAST), Container Image và kiểm thử động (DAST) |
-| **Đóng gói & Registry** | Docker Buildx, GitHub Container Registry (GHCR)                | Đóng gói Multi-stage Image (`ghcr.io/snowyy16/e-invoice/bff`)                                      |
-| **Hạ tầng & GitOps**    | Kubernetes (`v1.30`), Argo CD                                  | Điều phối Container có tính sẵn sàng cao (2 Replicas) và đồng bộ tự động từ nhánh `gitops`         |
-| **Giám sát & Cảnh báo** | Prometheus, Grafana, Telegram Bot API                          | Thu thập chỉ số thời gian thực (`/api/metrics`), trực quan hóa Dashboard và gửi cảnh báo ChatOps   |
+| Tầng (Layer)            | Công nghệ / Công cụ                                 | Vai trò trong hệ thống                                                                           |
+| :---------------------- | :-------------------------------------------------- | :----------------------------------------------------------------------------------------------- |
+| **Ứng dụng & CSDL**     | NestJS, React, TypeScript, Prisma, PostgreSQL 16    | Xử lý nghiệp vụ hóa đơn điện tử, ký số XML và lưu trữ dữ liệu                                    |
+| **CI & Build**          | Nx Workspace, pnpm, GitHub Actions                  | Tự động hóa kiểm tra cú pháp, biên dịch và kiểm thử                                              |
+| **Bảo mật (DevSecOps)** | Gitleaks, `pnpm audit`, SonarQube Cloud, Aqua Trivy | Quét Secret, lỗ hổng thư viện (SCA), mã nguồn tĩnh (SAST) và quét lỗ hổng Container Image        |
+| **Đóng gói & Registry** | Docker Buildx, GitHub Container Registry (GHCR)     | Đóng gói Multi-stage Image (`ghcr.io/snowyy16/e-invoice/bff`)                                    |
+| **Hạ tầng & GitOps**    | Kubernetes (`v1.30`), Argo CD                       | Điều phối Container có tính sẵn sàng cao (2 Replicas) và đồng bộ tự động từ nhánh `gitops`       |
+| **Giám sát & Cảnh báo** | Prometheus, Grafana, Telegram Bot API               | Thu thập chỉ số thời gian thực (`/api/metrics`), trực quan hóa Dashboard và gửi cảnh báo ChatOps |
 
 ---
 
