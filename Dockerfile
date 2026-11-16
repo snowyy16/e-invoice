@@ -1,6 +1,4 @@
-# ==========================================
 # giai đoạn xây dựng bộ mã nguồn
-# ==========================================
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -16,9 +14,7 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm nx build bff
 
-# ==========================================
 # giai đoạn khởi chạy môi trường thực tế
-# ==========================================
 FROM node:20-alpine AS runner
 
 WORKDIR /app

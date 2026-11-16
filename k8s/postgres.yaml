@@ -1,3 +1,4 @@
+# cấu hình triển khai cơ sở dữ liệu postgresql kèm ổ đĩa lưu trữ bền vững và dịch vụ kết nối nội bộ
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

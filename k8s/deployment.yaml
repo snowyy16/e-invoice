@@ -1,3 +1,4 @@
+# cấu hình triển khai các bản sao ứng dụng backend bff và dịch vụ cân bằng tải nội bộ trên kubernetes
 apiVersion: apps/v1
 kind: Deployment
 metadata:
