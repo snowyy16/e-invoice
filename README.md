@@ -14,33 +14,47 @@ Hệ thống quản lý, ký số và tra cứu **Hóa đơn Điện tử (E-Inv
 ## 🏗️ Sơ đồ Kiến trúc DevSecOps & GitOps Pipeline
 
 ```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 40, "rankSpacing": 50}} }%%
 flowchart TB
     subgraph DEV["👨‍💻 1. Code & GitFlow"]
+        direction LR
         A["Developer Push / PR<br/>(dev ➔ main)"] --> B["GitHub Branch Ruleset<br/>(4 Required Status Checks)"]
     end
 
     subgraph CI_SEC["🛡️ 2. CI & Continuous Security (Shift-Left)"]
-        B --> C["Job 1: CI Automation<br/>(ESLint, Prisma Migrate, Build & Health Check)"]
-        B --> D["Job 2: Security Scanning<br/>(Gitleaks, pnpm audit, Trivy FS & SonarQube Cloud)"]
+        direction LR
+        C["Job 1: CI Automation<br/>(ESLint, Prisma Migrate,<br/>Build & Health Check)"]
+        D["Job 2: Security Scanning<br/>(Gitleaks, pnpm audit,<br/>Trivy FS & SonarQube Cloud)"]
     end
 
     subgraph ARTIFACT["📦 3. Artifact Management"]
-        C & D --> E["Job 3: Docker Multi-Stage Build<br/>Push GHCR (:latest & :sha)<br/>+ Trivy Image Scan"]
+        direction LR
+        E["Job 3: Docker Multi-Stage Build<br/>Push GHCR (:latest & :sha)<br/>+ Trivy Image Scan"]
     end
 
     subgraph CD_GITOPS["🚀 4. Continuous Deployment & GitOps (Kubernetes)"]
-        E --> F["Job 4: Production Approval Gate<br/>Cập nhật k8s/deployment.yaml ➔ nhánh gitops"]
-        F --> G["Argo CD Controller<br/>Tự động Sync từ nhánh gitops vào K8s Cluster"]
-        G --> H["Kubernetes Namespace: default<br/>• einvoice-bff (2 Pods HA)<br/>• einvoice-postgres (1 Pod + 1Gi PVC)<br/>• einvoice-secrets (Opaque Secret)"]
+        direction LR
+        F["Job 4: Production Approval Gate<br/>Cập nhật k8s/deployment.yaml<br/>➔ nhánh gitops"]
+        G["Argo CD Controller<br/>Tự động Sync từ nhánh gitops<br/>vào K8s Cluster"]
+        H["Kubernetes Namespace: default<br/>• einvoice-bff (2 Pods HA)<br/>• einvoice-postgres (1 Pod + 1Gi PVC)<br/>• einvoice-secrets (Opaque Secret)"]
+        F --> G --> H
     end
 
     subgraph OBS["📊 5. Observability & ChatOps"]
-        H --> I["Prometheus (/api/metrics)<br/>& Grafana Dashboard"]
-        F --> J["Job 5: Telegram Bot Notification<br/>(Báo cáo trạng thái Pipeline tức thì)"]
+        direction LR
+        I["Prometheus (/api/metrics)<br/>& Grafana Dashboard"]
+        J["Job 5: Telegram Bot Notification<br/>(Báo cáo trạng thái Pipeline tức thì)"]
     end
-```
 
----
+    %% Luồng chính
+    B --> C
+    B --> D
+    C --> E
+    D --> E
+    E --> F
+    H --> I
+    F --> J
+```
 
 ## 📂 Cấu trúc Kho lưu trữ (Nx Monorepo)
 
