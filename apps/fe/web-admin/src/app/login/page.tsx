@@ -86,7 +86,7 @@ function LoginPortalContent() {
           transition: 'all 0.3s ease',
         }}
       >
-        {/* Portal Switcher Tabs */}
+        {/* thanh chuyển đổi giữa các cổng đăng nhập */}
         <div
           style={{
             display: 'grid',
@@ -186,7 +186,7 @@ function LoginPortalContent() {
           </button>
         </div>
 
-        {/* Header Description */}
+        {/* phần mô tả tiêu đề cổng đăng nhập */}
         <div
           style={{
             padding: '24px 28px 16px',
@@ -221,7 +221,7 @@ function LoginPortalContent() {
           </p>
         </div>
 
-        {/* Content Form */}
+        {/* biểu mẫu nhập thông tin đăng nhập */}
         <div style={{ padding: '0 28px 28px' }}>
           {error && (
             <div
@@ -243,7 +243,7 @@ function LoginPortalContent() {
             </div>
           )}
 
-          {/* Quick Demo Selection */}
+          {/* khu vực chọn nhanh tài khoản dùng thử */}
           <div style={{ marginBottom: '18px' }}>
             <div
               style={{
@@ -500,7 +500,7 @@ function LoginPortalContent() {
             </button>
           </form>
 
-          {/* Direct Link Shortcuts */}
+          {/* các liên kết tắt chuyển trang trực tiếp */}
           <div
             style={{
               marginTop: '20px',

@@ -77,7 +77,7 @@ export default function CustomerPortalPage() {
         return;
       }
 
-      // Nếu 404 từ API backend, kiểm tra mã demo tĩnh
+      // nếu không tìm thấy từ máy chủ backend thì kiểm tra mã dùng thử tĩnh
       if (cleanCode === 'EINV-DEMO01') {
         setResult({
           invoiceNumber: 'INV-2026-0001',
@@ -119,7 +119,7 @@ export default function CustomerPortalPage() {
         `Không tìm thấy hóa đơn điện tử với mã tra cứu "${cleanCode}". Vui lòng kiểm tra lại mã hoặc liên hệ đơn vị phát hành!`,
       );
     } catch {
-      // Fallback offline mock nếu backend chưa bật
+      // dùng dữ liệu giả lập ngoại tuyến nếu máy chủ backend chưa bật
       if (cleanCode === 'EINV-DEMO01') {
         setResult({
           invoiceNumber: 'INV-2026-0001',
@@ -160,7 +160,7 @@ export default function CustomerPortalPage() {
       }
 
       if (!xmlContent) {
-        // Fallback chuẩn XML TT78
+        // tạo dữ liệu xml dự phòng theo chuẩn thông tư 78
         xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <HDon>
   <DLHDon Id="HD_${result.invoiceNumber}">
@@ -241,7 +241,7 @@ export default function CustomerPortalPage() {
         color: '#0f172a',
       }}
     >
-      {/* Portal Top Trust Header */}
+      {/* thanh tiêu đề xác thực cổng tra cứu hóa đơn */}
       <div
         style={{
           display: 'flex',
@@ -296,7 +296,7 @@ export default function CustomerPortalPage() {
         </div>
       </div>
 
-      {/* Main Title Section */}
+      {/* phần tiêu đề chính của trang tra cứu */}
       <div style={{ marginBottom: '24px' }}>
         <h1
           data-testid="portal-title"
@@ -323,7 +323,7 @@ export default function CustomerPortalPage() {
         </p>
       </div>
 
-      {/* Lookup Code Form */}
+      {/* biểu mẫu nhập mã nhận diện để tra cứu hóa đơn */}
       <div
         style={{
           background: '#ffffff',
@@ -461,7 +461,7 @@ export default function CustomerPortalPage() {
         )}
       </div>
 
-      {/* Verified Invoice Result Card */}
+      {/* thẻ hiển thị kết quả hóa đơn đã được xác thực */}
       {result && (
         <div
           data-testid="lookup-result"
@@ -477,7 +477,7 @@ export default function CustomerPortalPage() {
             position: 'relative',
           }}
         >
-          {/* Certificate Badge */}
+          {/* huy hiệu chứng nhận chữ ký số hợp lệ */}
           <div
             style={{
               display: 'flex',
@@ -544,7 +544,7 @@ export default function CustomerPortalPage() {
             </div>
           </div>
 
-          {/* Tax Authority Badge if issued */}
+          {/* huy hiệu mã cơ quan thuế nếu hóa đơn đã cấp mã */}
           {result.taxAuthorityCode && (
             <div
               style={{
@@ -580,7 +580,7 @@ export default function CustomerPortalPage() {
             </div>
           )}
 
-          {/* Parties Grid */}
+          {/* khung thông tin bên bán và bên mua */}
           <div
             style={{
               display: 'grid',
@@ -645,7 +645,7 @@ export default function CustomerPortalPage() {
             </div>
           </div>
 
-          {/* Amounts Breakdown */}
+          {/* bảng phân tách chi tiết tiền trước thuế tiền thuế và tổng tiền */}
           <div
             style={{
               borderTop: '1px dashed #cbd5e1',
@@ -689,7 +689,7 @@ export default function CustomerPortalPage() {
             </div>
           </div>
 
-          {/* Action Toolbar: Download XML */}
+          {/* thanh công cụ tải xuống hồ sơ gốc định dạng xml */}
           <div
             style={{
               marginTop: '18px',
@@ -727,7 +727,7 @@ export default function CustomerPortalPage() {
         </div>
       )}
 
-      {/* AI OCR Extraction Box */}
+      {/* khu vực tải tệp hóa đơn để bóc tách dữ liệu tự động */}
       <div
         style={{
           background: '#faf5ff',

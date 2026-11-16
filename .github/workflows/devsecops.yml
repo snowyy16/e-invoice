@@ -18,7 +18,7 @@ env:
 
 jobs:
   # ===============================================================
-  # 1. CI (AUTOMATION): BUILD, HEALTH CHECK, TEST & COVERAGE
+  # 1. tích hợp liên tục tự động biên dịch kiểm tra sức khỏe kiểm thử và độ bao phủ mã nguồn
   # ===============================================================
   ci-build-and-test:
     name: 1. CI Automation (Build, Health Check & Tests)
@@ -79,7 +79,7 @@ jobs:
           retention-days: 7
 
   # ===============================================================
-  # 2. CONTINUOUS SECURITY: SAST, SCA, SECRETS & SECURITY GATES
+  # 2. kiểm tra bảo mật liên tục phân tích mã tĩnh thư viện phụ thuộc khóa bí mật và cổng bảo mật
   # ===============================================================
   continuous-security:
     name: 2. Continuous Security (Gitleaks, Audit, Trivy & Sonar)
@@ -92,20 +92,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      # --- 2.1. SECRET DETECTION (GITLEAKS) ---
+      # ---2.1 phát hiện rò rỉ khóa bí mật bằng gitleaks ---
       - name: 2.1. Secret Detection (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
-      # --- 2.2. DEPENDENCY AUDIT (SCA) ---
+      # ---2.2 kiểm toán lỗ hổng thư viện phụ thuộc ---
       - name: 2.2. Dependency Vulnerability Audit
         run: |
           echo "Scanning dependencies with pnpm audit..."
           pnpm audit --audit-level=high || echo "::warning::Pnpm audit detected vulnerabilities. Review security report."
 
-      # --- 2.3. TRIVY FILESYSTEM & DEPENDENCY SCAN ---
+      # ---2.3 quét hệ thống tệp tin và thư viện phụ thuộc bằng trivy ---
       - name: 2.3. Trivy Filesystem & Dependency Scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -121,7 +121,7 @@ jobs:
             cat trivy-fs-report.txt
           fi
 
-      # --- 2.4. SONARQUBE / SONARCLOUD CODE QUALITY ANALYSIS ---
+      # ---2.4 phân tích chất lượng mã nguồn bằng sonarqube và sonarcloud ---
       - name: 2.4. SonarQube Code Quality Analysis
         uses: sonarsource/sonarqube-scan-action@master
         env:
@@ -129,7 +129,7 @@ jobs:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         continue-on-error: true
 
-      # --- 2.5. SECURITY GATES: LƯU BÁO CÁO BẢO MẬT ---
+      # ---2.5 cổng bảo mật lưu báo cáo bảo mật ---
       - name: 2.5. Upload Security Reports (Nexus / Artifact Stand-in)
         uses: actions/upload-artifact@v4
         if: always()
@@ -139,7 +139,7 @@ jobs:
           retention-days: 7
 
   # ===============================================================
-  # 3. ARTIFACT MANAGEMENT: DOCKER BUILD, IMAGE SCAN & PUSH GHCR
+  # 3. quản lý gói thành phẩm đóng gói docker quét ảnh container và đẩy lên kho lưu trữ
   # ===============================================================
   docker-build-and-publish:
     name: 3. Artifact Management (Docker & GHCR)
@@ -163,7 +163,7 @@ jobs:
             type=sha,format=short
             type=raw,value=${{ github.sha }}
 
-      # --- DOCKER BUILD LOCAL ---
+      # --- đóng gói ảnh docker cục bộ để quét bảo mật ---
       - name: Docker Build (Local for Scanning)
         uses: docker/build-push-action@v5
         with:
@@ -174,7 +174,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # --- TRIVY CONTAINER IMAGE SCAN ---
+      # --- quét lỗ hổng bảo mật ảnh container bằng trivy ---
       - name: Run Trivy Image Scan (Security Gate)
         uses: aquasecurity/trivy-action@master
         with:
@@ -183,7 +183,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
 
-      # --- LOG IN TO GITHUB CONTAINER REGISTRY (GHCR) ---
+      # --- đăng nhập vào kho lưu trữ ảnh container trên github ---
       - name: Log in to GitHub Container Registry (GHCR)
         uses: docker/login-action@v3
         with:
@@ -191,7 +191,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # --- PUSH DOCKER IMAGE TO GHCR ---
+      # --- đẩy ảnh docker lên kho lưu trữ github ---
       - name: Push Docker Image to GHCR
         uses: docker/build-push-action@v5
         with:
@@ -202,7 +202,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   # ===============================================================
-  # 4. CD (DEPLOYMENT) & RUNTIME PLATFORM (ARGOCD & KUBERNETES)
+  # 4. triển khai liên tục và nền tảng vận hành argocd cùng kubernetes
   # ===============================================================
   cd-deployment:
     name: 4. CD Deployment (Approval & Argo CD)
@@ -210,7 +210,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
 
-    # Kích hoạt tính năng GitHub Environment Approval (Manual Review)
+    # kích hoạt tính năng phê duyệt môi trường triển khai thủ công trên github
     environment:
       name: production
       url: https://einvoice.example.com
@@ -239,7 +239,7 @@ jobs:
           echo "=========================================================="
 
   # ===============================================================
-  # 5. PIPELINE NOTIFICATION (TELEGRAM BOT ALERT)
+  # 5. gửi thông báo trạng thái quy trình qua telegram bot
   # ===============================================================
   notify:
     name: 5. Pipeline Notification (Telegram)
@@ -268,7 +268,7 @@ jobs:
             STATUS_TEXT="THẤT BẠI (FAILED)"
           fi
 
-          # Lay dong dau tien va loai bo ky tu gay loi dinh dang Telegram Markdown
+          # lấy dòng đầu tiên và loại bỏ ký tự gây lỗi định dạng văn bản trên telegram
           CLEAN_MSG=$(echo "$RAW_COMMIT_MSG" | head -n 1 | sed 's/[*_`\\]//g')
           FULL_SHA="${{ github.sha }}"
           SHORT_SHA="${FULL_SHA:0:7}"

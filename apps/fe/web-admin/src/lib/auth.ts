@@ -99,7 +99,7 @@ export async function loginUser(
     }
   }
 
-  // Client-side fallback if backend service is offline
+  // cơ chế xử lý dự phòng ở phía trình duyệt nếu máy chủ backend đang ngoại tuyến
   const clean = email.trim().toLowerCase();
   let matched: {
     email: string;

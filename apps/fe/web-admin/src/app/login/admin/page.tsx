@@ -63,7 +63,7 @@ export default function AdminLoginPage() {
           overflow: 'hidden',
         }}
       >
-        {/* Top Security Status Bar */}
+        {/* thanh trạng thái bảo mật phía trên cùng */}
         <div
           style={{
             padding: '12px 24px',
@@ -105,7 +105,7 @@ export default function AdminLoginPage() {
           </span>
         </div>
 
-        {/* Header Branding */}
+        {/* phần tiêu đề và nhận diện thương hiệu */}
         <div style={{ padding: '32px 28px 24px', textAlign: 'center' }}>
           <div
             style={{
@@ -149,7 +149,7 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        {/* Form Body */}
+        {/* phần thân biểu mẫu đăng nhập */}
         <div style={{ padding: '0 28px 32px' }}>
           {error && (
             <div
@@ -175,7 +175,7 @@ export default function AdminLoginPage() {
             </div>
           )}
 
-          {/* Quick Demo Credentials Pill */}
+          {/* nút điền nhanh tài khoản quản trị viên thử nghiệm */}
           <div
             style={{
               background: '#131d31',
@@ -337,7 +337,7 @@ export default function AdminLoginPage() {
             </button>
           </form>
 
-          {/* Switcher to Accountant Portal */}
+          {/* liên kết chuyển sang cổng đăng nhập kế toán */}
           <div
             style={{
               marginTop: '24px',
