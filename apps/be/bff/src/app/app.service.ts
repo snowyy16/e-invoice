@@ -43,7 +43,7 @@ export class AppService {
     private readonly dataSource: DataSource,
   ) {}
 
-  // ---------------------------------------------------------------- Health
+  // ---------------------------------------------------------------- kiểm tra trạng thái hệ thống
 
   async getHealth() {
     try {
@@ -63,7 +63,7 @@ export class AppService {
     };
   }
 
-  // ----------------------------------------------------------------- Users
+  // ----------------------------------------------------------------- quản lý người dùng
 
   async getUsers() {
     // passwordHash có select:false nên không bao giờ lọt ra API.
@@ -124,7 +124,7 @@ export class AppService {
     };
   }
 
-  // -------------------------------------------------------------- Invoices
+  // -------------------------------------------------------------- quản lý hóa đơn
 
   async findAll() {
     const invoices = await this.invoiceRepo.find({
@@ -266,7 +266,7 @@ export class AppService {
     }).xml;
   }
 
-  // --------------------------------------------------------------- Helpers
+  // --------------------------------------------------------------- các hàm bổ trợ
 
   private async findInvoiceOrFail(id: string): Promise<InvoiceEntity> {
     // id không phải UUID thì Postgres báo lỗi 500, nên trả 404 luôn.

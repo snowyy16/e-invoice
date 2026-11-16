@@ -1,6 +1,5 @@
 /**
- * This is not a production server yet!
- * This is only a minimal backend to get started.
+ * khởi tạo máy chủ dịch vụ backend trung gian xử lý nghiệp vụ hóa đơn điện tử
  */
 
 import { Logger } from '@nestjs/common';
@@ -15,16 +14,16 @@ async function bootstrap() {
   app.enableCors();
   const port = process.env.PORT || MICROSERVICE_PORTS.BFF;
   await app.listen(port);
-  // Set when Nx waits for this server to be ready
+  // thiết lập tín hiệu khi công cụ nx chờ máy chủ khởi động hoàn tất
   if (process.env.NX_READY_SIGNAL_SOCKET) {
     try {
-      // Function keeps TypeScript and bundlers from rewriting or bundling the import
+      // hàm giữ cho trình biên dịch không tự ý viết lại hoặc gộp lệnh nạp thư viện
       const load = new Function('s', 'return import(s)') as (
         s: string,
       ) => Promise<{ emitReadySignal(server: unknown): boolean }>;
       (await load('@nx/js/ready-signal')).emitReadySignal(app.getHttpServer());
     } catch {
-      // @nx/js isn't installed
+      // bỏ qua nếu gói thư viện tín hiệu chưa được cài đặt
     }
   }
   Logger.log(

@@ -285,7 +285,7 @@ export default function AdminDashboardPage() {
         background: '#ffffff',
       }}
     >
-      {/* Top Application Bar */}
+      {/* thanh điều hướng ứng dụng phía trên cùng */}
       <header
         style={{
           display: 'flex',
@@ -327,7 +327,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* User Auth Info / Navigation */}
+        {/* thông tin người dùng đang đăng nhập và điều hướng */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {currentUser ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -384,7 +384,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Quick switch test pills */}
+              {/* các nút chuyển đổi nhanh tài khoản kiểm thử */}
               <div
                 style={{
                   display: 'flex',
@@ -511,7 +511,7 @@ export default function AdminDashboardPage() {
         </div>
       </header>
 
-      {/* Main Title & Key Metrics Grid */}
+      {/* tiêu đề chính và lưới hiển thị các chỉ số thống kê */}
       <div
         style={{
           display: 'grid',
@@ -654,7 +654,7 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Admin Tab Switcher if user is ADMIN */}
+      {/* thanh chuyển tab dành riêng cho quản trị viên */}
       {isAdmin && (
         <div
           style={{
@@ -708,7 +708,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Admin User Management Section */}
+      {/* khu vực quản lý tài khoản người dùng của quản trị viên */}
       {isAdmin && activeTab === 'USERS' ? (
         <section
           data-testid="admin-users-section"
@@ -916,10 +916,10 @@ export default function AdminDashboardPage() {
         </section>
       ) : null}
 
-      {/* Invoice Creation Form and Kanban Board */}
+      {/* khu vực biểu mẫu lập hóa đơn và bảng trạng thái kanban */}
       {(!isAdmin || activeTab === 'KANBAN') && (
         <>
-          {/* Create Invoice Form */}
+          {/* biểu mẫu khởi tạo hóa đơn mới */}
           <form
             onSubmit={handleCreate}
             style={{
@@ -1046,7 +1046,7 @@ export default function AdminDashboardPage() {
             </button>
           </form>
 
-          {/* Kanban Board */}
+          {/* bảng quản lý hóa đơn theo từng cột trạng thái */}
           <section
             style={{
               display: 'grid',
@@ -1068,7 +1068,7 @@ export default function AdminDashboardPage() {
                   flexDirection: 'column',
                 }}
               >
-                {/* Column Header */}
+                {/* tiêu đề cột trạng thái hóa đơn */}
                 <div
                   style={{
                     display: 'flex',
@@ -1103,7 +1103,7 @@ export default function AdminDashboardPage() {
                   </span>
                 </div>
 
-                {/* Cards List */}
+                {/* danh sách các thẻ hóa đơn trong cột */}
                 <div
                   style={{
                     flex: 1,
@@ -1129,7 +1129,7 @@ export default function AdminDashboardPage() {
                           gap: '6px',
                         }}
                       >
-                        {/* Invoice Number & Code */}
+                        {/* số hóa đơn và mã tra cứu */}
                         <div
                           style={{
                             display: 'flex',
@@ -1162,7 +1162,7 @@ export default function AdminDashboardPage() {
                           </span>
                         </div>
 
-                        {/* Buyer Name */}
+                        {/* tên đơn vị hoặc cá nhân mua hàng */}
                         <div
                           style={{
                             fontSize: '14px',
@@ -1174,12 +1174,12 @@ export default function AdminDashboardPage() {
                           {inv.buyerName}
                         </div>
 
-                        {/* Buyer Tax Code */}
+                        {/* mã số thuế người mua */}
                         <div style={{ fontSize: '12px', color: '#64748b' }}>
                           MST: <b>{inv.buyerTaxCode}</b>
                         </div>
 
-                        {/* CQT code if issued */}
+                        {/* mã của cơ quan thuế nếu hóa đơn đã phát hành */}
                         {inv.taxAuthorityCode && (
                           <div
                             style={{
@@ -1192,7 +1192,7 @@ export default function AdminDashboardPage() {
                           </div>
                         )}
 
-                        {/* Total Amount */}
+                        {/* tổng số tiền thanh toán */}
                         <div
                           style={{
                             display: 'flex',
@@ -1217,7 +1217,7 @@ export default function AdminDashboardPage() {
                           </span>
                         </div>
 
-                        {/* Action Buttons */}
+                        {/* cụm nút thao tác xử lý hóa đơn */}
                         <div
                           style={{
                             marginTop: '8px',
@@ -1287,7 +1287,7 @@ export default function AdminDashboardPage() {
                             </button>
                           )}
 
-                          {/* Preview VAT Invoice & Print Button */}
+                          {/* nút xem trước bản thể hiện hóa đơn giá trị gia tăng và in */}
                           <button
                             type="button"
                             onClick={() => setSelectedInvoice(inv)}
@@ -1319,7 +1319,7 @@ export default function AdminDashboardPage() {
         </>
       )}
 
-      {/* OFFICIAL VAT INVOICE PREVIEW MODAL (Chuẩn Thông tư 78/2021/TT-BTC) */}
+      {/* cửa sổ xem trước bản thể hiện hóa đơn giá trị gia tăng chuẩn thông tư 78 */}
       {selectedInvoice && (
         <div
           style={{
@@ -1347,7 +1347,7 @@ export default function AdminDashboardPage() {
               flexDirection: 'column',
             }}
           >
-            {/* Modal Actions Header */}
+            {/* thanh công cụ thao tác trên cửa sổ xem trước */}
             <div
               style={{
                 padding: '12px 24px',
@@ -1416,7 +1416,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* Official Invoice Sheet */}
+            {/* tờ phôi bản thể hiện hóa đơn chính thức */}
             <div
               id="printable-invoice"
               style={{
@@ -1426,7 +1426,7 @@ export default function AdminDashboardPage() {
                 lineHeight: 1.4,
               }}
             >
-              {/* Header Box */}
+              {/* khung thông tin đơn vị bán hàng ở đầu hóa đơn */}
               <div
                 style={{
                   display: 'flex',
@@ -1485,7 +1485,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Title */}
+              {/* tiêu đề hóa đơn giá trị gia tăng và ký hiệu mẫu số */}
               <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                 <h2
                   style={{
@@ -1524,7 +1524,7 @@ export default function AdminDashboardPage() {
                 )}
               </div>
 
-              {/* Buyer Info */}
+              {/* thông tin chi tiết đơn vị mua hàng */}
               <div
                 style={{
                   background: '#f8fafc',
@@ -1551,7 +1551,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Items Table */}
+              {/* bảng kê chi tiết hàng hóa và dịch vụ */}
               <table
                 style={{
                   width: '100%',
@@ -1695,7 +1695,7 @@ export default function AdminDashboardPage() {
                 </tbody>
               </table>
 
-              {/* Total Calculation */}
+              {/* phần tổng hợp tiền hàng tiền thuế và tổng thanh toán */}
               <div
                 style={{
                   display: 'flex',
@@ -1762,7 +1762,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Signatures Footer */}
+              {/* phần chữ ký của người mua và người bán ở cuối hóa đơn */}
               <div
                 style={{
                   display: 'grid',
@@ -1801,7 +1801,7 @@ export default function AdminDashboardPage() {
                     (Ký số điện tử)
                   </div>
 
-                  {/* Stamp Digital Signature Box */}
+                  {/* khung con dấu xác nhận chữ ký số điện tử hợp lệ */}
                   {selectedInvoice.status !== 'PENDING' ? (
                     <div
                       style={{

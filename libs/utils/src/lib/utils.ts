@@ -80,7 +80,7 @@ export function generateInvoiceXml(invoice: {
     invoice.taxAuthorityCode || generateTaxAuthorityCode(invoice.buyerTaxCode);
   const signer = invoice.signedBy || 'Nguyễn Văn A (Kế toán trưởng)';
 
-  // Dummy base64 digest for digital signature
+  // tạo chuỗi băm giả lập định dạng base64 cho chữ ký số điện tử
   const rawContent = `${invoice.invoiceNumber}|${invoice.buyerTaxCode}|${invoice.totalAmount}|${signDate}`;
   const signatureDigest = Buffer.from(rawContent).toString('base64');
 

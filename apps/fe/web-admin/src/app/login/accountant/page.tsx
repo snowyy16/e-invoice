@@ -63,7 +63,7 @@ export default function AccountantLoginPage() {
           overflow: 'hidden',
         }}
       >
-        {/* Top Status Bar */}
+        {/* thanh trạng thái phía trên cùng */}
         <div
           style={{
             padding: '12px 24px',
@@ -104,7 +104,7 @@ export default function AccountantLoginPage() {
           </span>
         </div>
 
-        {/* Header */}
+        {/* phần tiêu đề đầu trang */}
         <div style={{ padding: '32px 28px 20px', textAlign: 'center' }}>
           <div
             style={{
@@ -148,7 +148,7 @@ export default function AccountantLoginPage() {
           </p>
         </div>
 
-        {/* Content Body */}
+        {/* phần nội dung chính của biểu mẫu */}
         <div style={{ padding: '0 28px 32px' }}>
           {error && (
             <div
@@ -174,7 +174,7 @@ export default function AccountantLoginPage() {
             </div>
           )}
 
-          {/* Quick Role Selection Cards */}
+          {/* các thẻ chọn nhanh vai trò đăng nhập thử nghiệm */}
           <div style={{ marginBottom: '20px' }}>
             <div
               style={{
@@ -378,7 +378,7 @@ export default function AccountantLoginPage() {
             </button>
           </form>
 
-          {/* Switch to Admin Portal */}
+          {/* nút chuyển sang cổng đăng nhập quản trị viên */}
           <div
             style={{
               marginTop: '24px',
