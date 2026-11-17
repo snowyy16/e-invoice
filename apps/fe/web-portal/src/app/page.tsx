@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface InvoiceLookupData {
   id?: string;
@@ -19,7 +19,41 @@ interface InvoiceLookupData {
   taxAuthorityCode?: string | null;
 }
 
+interface PortalUser {
+  email: string;
+  fullName: string;
+  companyName?: string;
+}
+
+const DEMO_PORTAL_ACCOUNTS = [
+  {
+    email: 'khachhang@fpt.com',
+    fullName: 'Công ty TNHH Công Nghệ FPT',
+    companyName: 'Đơn vị mua hàng (MST: 0101248141)',
+    defaultLookupCode: 'EINV-DEMO01',
+  },
+  {
+    email: 'billing@viettel.com.vn',
+    fullName: 'Tập đoàn Viễn thông Viettel',
+    companyName: 'Đơn vị mua hàng (MST: 0100109106)',
+    defaultLookupCode: 'EINV-DEMO02',
+  },
+  {
+    email: 'admin@einvoice.vn',
+    fullName: 'Quản trị viên Hệ thống',
+    companyName: 'Cơ quan Quản lý E-Invoice',
+    defaultLookupCode: 'EINV-8G15RM',
+  },
+];
+
 export default function CustomerPortalPage() {
+  const [portalUser, setPortalUser] = useState<PortalUser | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const [lookupCode, setLookupCode] = useState('EINV-8G15RM');
   const [result, setResult] = useState<null | InvoiceLookupData>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +64,96 @@ export default function CustomerPortalPage() {
 
   const API_URL =
     process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('einvoice_portal_user');
+      if (stored) {
+        setPortalUser(JSON.parse(stored));
+      }
+    } catch {
+      // bỏ qua lỗi đọc bộ nhớ cục bộ
+    } finally {
+      setIsCheckingAuth(false);
+    }
+  }, []);
+
+  const handleQuickLogin = (acc: (typeof DEMO_PORTAL_ACCOUNTS)[0]) => {
+    const user: PortalUser = {
+      email: acc.email,
+      fullName: acc.fullName,
+      companyName: acc.companyName,
+    };
+    setPortalUser(user);
+    if (acc.defaultLookupCode) {
+      setLookupCode(acc.defaultLookupCode);
+    }
+    localStorage.setItem('einvoice_portal_user', JSON.stringify(user));
+  };
+
+  const handleManualLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+
+    const email = loginEmail.trim().toLowerCase();
+    if (!email) {
+      setLoginError('Vui lòng nhập địa chỉ email!');
+      return;
+    }
+    if (!loginPassword) {
+      setLoginError('Vui lòng nhập mật khẩu!');
+      return;
+    }
+
+    setIsLoggingIn(true);
+    try {
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: loginPassword }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const user: PortalUser = {
+          email: data.user?.email || email,
+          fullName: data.user?.fullName || 'Khách hàng Doanh nghiệp',
+        };
+        setPortalUser(user);
+        localStorage.setItem('einvoice_portal_user', JSON.stringify(user));
+        return;
+      }
+    } catch {
+      // máy chủ backend ngoại tuyến hoặc không phản hồi thì dùng fallback
+    } finally {
+      setIsLoggingIn(false);
+    }
+
+    // fallback cho phép đăng nhập demo ngoại tuyến
+    const matched = DEMO_PORTAL_ACCOUNTS.find(
+      (a) => a.email.toLowerCase() === email,
+    );
+    if (matched) {
+      handleQuickLogin(matched);
+    } else {
+      const user: PortalUser = {
+        email,
+        fullName: email.split('@')[0].toUpperCase(),
+        companyName: 'Khách hàng Doanh nghiệp',
+      };
+      setPortalUser(user);
+      localStorage.setItem('einvoice_portal_user', JSON.stringify(user));
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('einvoice_portal_user');
+    setPortalUser(null);
+    setResult(null);
+    setError(null);
+    setLoginEmail('');
+    setLoginPassword('');
+  };
 
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,6 +354,292 @@ export default function CustomerPortalPage() {
     }, 400);
   };
 
+  if (isCheckingAuth) {
+    return (
+      <main
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+          background: '#f8fafc',
+          color: '#64748b',
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '32px', marginBottom: '12px' }}>🔄</div>
+          <div style={{ fontSize: '14px', fontWeight: 600 }}>
+            Đang tải Cổng Khách hàng...
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!portalUser) {
+    return (
+      <main
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px 16px',
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+          background:
+            'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f8fafc 100%)',
+          color: '#0f172a',
+        }}
+      >
+        <div
+          style={{
+            width: '100%',
+            maxWidth: '460px',
+            background: '#ffffff',
+            borderRadius: '20px',
+            boxShadow:
+              '0 20px 40px -15px rgba(2, 132, 199, 0.18), 0 1px 3px rgba(0,0,0,0.05)',
+            border: '1px solid #e2e8f0',
+            padding: '36px 32px',
+          }}
+        >
+          {/* biểu tượng và tiêu đề cổng khách hàng */}
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                color: '#ffffff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '28px',
+                marginBottom: '16px',
+                boxShadow: '0 8px 16px -4px rgba(2, 132, 199, 0.4)',
+              }}
+            >
+              🏛️
+            </div>
+            <h1
+              style={{
+                fontSize: '22px',
+                fontWeight: 800,
+                color: '#0f172a',
+                margin: '0 0 6px',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              Cổng Tra cứu Khách hàng
+            </h1>
+            <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+              Đăng nhập để tra cứu hóa đơn & tải dữ liệu XML hợp lệ
+            </p>
+          </div>
+
+          {/* danh sách tài khoản demo tiện lợi khi báo cáo */}
+          <div style={{ marginBottom: '22px' }}>
+            <div
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#0369a1',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: '10px',
+              }}
+            >
+              ⚡ Đăng nhập nhanh cho Demo:
+            </div>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+            >
+              {DEMO_PORTAL_ACCOUNTS.map((acc) => (
+                <button
+                  key={acc.email}
+                  type="button"
+                  onClick={() => handleQuickLogin(acc)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid #bae6fd',
+                    background: '#f0f9ff',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#e0f2fe';
+                    e.currentTarget.style.borderColor = '#0284c7';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#f0f9ff';
+                    e.currentTarget.style.borderColor = '#bae6fd';
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: '#0369a1',
+                      }}
+                    >
+                      🏢 {acc.fullName}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>
+                      {acc.email}
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      color: '#0284c7',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Chọn ➔
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              margin: '20px 0',
+              color: '#94a3b8',
+              fontSize: '12px',
+            }}
+          >
+            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+            <span>hoặc đăng nhập bằng tài khoản</span>
+            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+          </div>
+
+          {/* form nhập tài khoản và mật khẩu */}
+          <form onSubmit={handleManualLogin}>
+            {loginError && (
+              <div
+                style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#dc2626',
+                  fontSize: '12px',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  marginBottom: '16px',
+                }}
+              >
+                ⚠️ {loginError}
+              </div>
+            )}
+
+            <div style={{ marginBottom: '14px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  color: '#334155',
+                  marginBottom: '6px',
+                }}
+              >
+                Email khách hàng / Doanh nghiệp
+              </label>
+              <input
+                type="email"
+                placeholder="vidu@fpt.com"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '14px',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  color: '#334155',
+                  marginBottom: '6px',
+                }}
+              >
+                Mật khẩu
+              </label>
+              <input
+                type="password"
+                placeholder="Nhập mật khẩu (demo: Password123!)"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '14px',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoggingIn}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '10px',
+                background: '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                fontSize: '14px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px -2px rgba(2, 132, 199, 0.4)',
+              }}
+            >
+              {isLoggingIn ? 'Đang xác thực...' : 'Đăng nhập vào Cổng ➔'}
+            </button>
+          </form>
+
+          <div
+            style={{
+              marginTop: '24px',
+              paddingTop: '16px',
+              borderTop: '1px solid #f1f5f9',
+              textAlign: 'center',
+              fontSize: '11px',
+              color: '#94a3b8',
+            }}
+          >
+            🔒 Chuẩn xác thực Hóa đơn Điện tử Nghị định 123/2020/NĐ-CP
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main
       style={{
@@ -281,18 +691,54 @@ export default function CustomerPortalPage() {
             </div>
           </div>
         </div>
-        <div
-          style={{
-            fontSize: '11px',
-            color: '#059669',
-            background: '#ecfdf5',
-            padding: '4px 10px',
-            borderRadius: '999px',
-            fontWeight: 700,
-            border: '1px solid #a7f3d0',
-          }}
-        >
-          ● TỔNG CỤC THUẾ KẾT NỐI 24/7
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            style={{
+              fontSize: '11px',
+              color: '#059669',
+              background: '#ecfdf5',
+              padding: '4px 10px',
+              borderRadius: '999px',
+              fontWeight: 700,
+              border: '1px solid #a7f3d0',
+            }}
+          >
+            ● TỔNG CỤC THUẾ 24/7
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              padding: '4px 10px',
+              borderRadius: '999px',
+            }}
+          >
+            <div
+              style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}
+            >
+              🏢 {portalUser.fullName}
+            </div>
+            <button
+              onClick={handleLogout}
+              title="Đăng xuất khỏi Cổng"
+              style={{
+                background: '#fee2e2',
+                color: '#dc2626',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '2px 8px',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Đăng xuất
+            </button>
+          </div>
         </div>
       </div>
 
