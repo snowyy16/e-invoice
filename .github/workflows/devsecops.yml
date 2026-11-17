@@ -92,6 +92,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      # job này chạy trên runner mới nên cần cài lại node + pnpm để `pnpm audit` chạy được
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.18.0
+
       # ---2.1 phát hiện rò rỉ khóa bí mật bằng gitleaks ---
       - name: 2.1. Secret Detection (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
@@ -140,6 +151,8 @@ jobs:
 
   # ===============================================================
   # 3. quản lý gói thành phẩm đóng gói docker quét ảnh container và đẩy lên kho lưu trữ
+  #    - Pull request: chỉ build + quét, KHÔNG đăng nhập / đẩy image lên GHCR
+  #    - Push vào main / manual: build + quét + đẩy lên GHCR
   # ===============================================================
   docker-build-and-publish:
     name: 3. Artifact Management (Docker & GHCR)
@@ -183,16 +196,17 @@ jobs:
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
 
-      # --- đăng nhập vào kho lưu trữ ảnh container trên github ---
+      # --- chỉ đăng nhập + đẩy image khi KHÔNG phải pull request ---
       - name: Log in to GitHub Container Registry (GHCR)
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # --- đẩy ảnh docker lên kho lưu trữ github ---
       - name: Push Docker Image to GHCR
+        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -203,12 +217,14 @@ jobs:
 
   # ===============================================================
   # 4. triển khai liên tục và nền tảng vận hành argocd cùng kubernetes
+  #    Chỉ chạy khi push / manual trên main. Pull request sẽ bị skip
+  #    (không cần approval nên vẫn merge được bình thường).
   # ===============================================================
   cd-deployment:
     name: 4. CD Deployment (Approval & Argo CD)
     needs: docker-build-and-publish
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
 
     # kích hoạt tính năng phê duyệt môi trường triển khai thủ công trên github
     environment:
@@ -230,6 +246,7 @@ jobs:
           git add k8s/deployment.yaml
           git commit -m "chore(gitops): update bff image to ${{ github.sha }} [skip ci]" || echo "No changes to commit"
           git push origin HEAD:refs/heads/gitops --force
+
       - name: 4.2. Argo CD Sync Verification
         run: |
           echo "=========================================================="
@@ -240,11 +257,18 @@ jobs:
 
   # ===============================================================
   # 5. gửi thông báo trạng thái quy trình qua telegram bot
+  #    Chạy SAU khi CD kết thúc (success / failure / rejected / skipped)
+  #    - Pull request: CD bị skip -> vẫn coi là thành công nếu CI/Security/Docker pass
+  #    - Push main: CD phải success mới tính là thành công
   # ===============================================================
   notify:
     name: 5. Pipeline Notification (Telegram)
-    needs: [ci-build-and-test, continuous-security, docker-build-and-publish]
-    if: always()
+    needs:
+      - ci-build-and-test
+      - continuous-security
+      - docker-build-and-publish
+      - cd-deployment
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - name: Send Telegram Pipeline Alert
@@ -252,21 +276,41 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           RAW_COMMIT_MSG: ${{ github.event.head_commit.message || github.event.pull_request.title || 'N/A' }}
+          CI_RESULT: ${{ needs.ci-build-and-test.result }}
+          SEC_RESULT: ${{ needs.continuous-security.result }}
+          DOCKER_RESULT: ${{ needs.docker-build-and-publish.result }}
+          CD_RESULT: ${{ needs.cd-deployment.result }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
             echo "Telegram secrets chua duoc cau hinh tren GitHub. Bo qua gui tin nhan."
             exit 0
           fi
 
-          if [ "${{ needs.ci-build-and-test.result }}" == "success" ] && \
-             [ "${{ needs.continuous-security.result }}" == "success" ] && \
-             [ "${{ needs.docker-build-and-publish.result }}" == "success" ]; then
+          # CD hợp lệ khi: success (đã deploy) hoặc skipped (PR / không phải main)
+          if [ "$CI_RESULT" == "success" ] && \
+             [ "$SEC_RESULT" == "success" ] && \
+             [ "$DOCKER_RESULT" == "success" ] && \
+             { [ "$CD_RESULT" == "success" ] || [ "$CD_RESULT" == "skipped" ]; }; then
             STATUS_ICON="✅"
             STATUS_TEXT="THÀNH CÔNG (SUCCEEDED)"
           else
             STATUS_ICON="❌"
             STATUS_TEXT="THẤT BẠI (FAILED)"
           fi
+
+          case "$CD_RESULT" in
+            success)   CD_TEXT="✅ Đã triển khai" ;;
+            skipped)
+              if [ "$EVENT_NAME" == "pull_request" ]; then
+                CD_TEXT="⏭️ Bỏ qua (Pull Request)"
+              else
+                CD_TEXT="⏭️ Bỏ qua"
+              fi ;;
+            failure)   CD_TEXT="❌ Thất bại / bị từ chối phê duyệt" ;;
+            cancelled) CD_TEXT="⚠️ Đã hủy" ;;
+            *)         CD_TEXT="$CD_RESULT" ;;
+          esac
 
           # lấy dòng đầu tiên và loại bỏ ký tự gây lỗi định dạng văn bản trên telegram
           CLEAN_MSG=$(echo "$RAW_COMMIT_MSG" | head -n 1 | sed 's/[*_`\\]//g')
@@ -275,6 +319,7 @@ jobs:
 
           MESSAGE="🚀 *E-INVOICE DEVSECOPS PIPELINE*
           $STATUS_ICON *Trạng thái:* $STATUS_TEXT
+          🚢 *CD Deployment:* $CD_TEXT
           📦 *Repository:* \`${{ github.repository }}\`
           🌿 *Nhánh:* \`${{ github.ref_name }}\`
           👤 *Tác giả:* ${{ github.actor }}
