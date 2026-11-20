@@ -5,11 +5,14 @@ Write-Host "=====================================================" -ForegroundCo
 Write-Host "`n[1/3] Kiem tra trang thai cac Pod tren Kubernetes..." -ForegroundColor Yellow
 kubectl get pods -n default
 
-Write-Host "`n[2/3] Khoi dong 4 cong ket noi (Port-Forward)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoProfile -Command kubectl port-forward svc/einvoice-bff-service -n default 3000:80 --address 0.0.0.0" -WindowStyle Minimized
-Start-Process powershell -ArgumentList "-NoProfile -Command kubectl port-forward svc/argocd-server -n argocd 8080:443 --address 0.0.0.0" -WindowStyle Minimized
-Start-Process powershell -ArgumentList "-NoProfile -Command kubectl port-forward svc/prometheus-service -n default 9090:9090 --address 0.0.0.0" -WindowStyle Minimized
-Start-Process powershell -ArgumentList "-NoProfile -Command kubectl port-forward svc/grafana-service -n default 3001:3000 --address 0.0.0.0" -WindowStyle Minimized
+Write-Host "`n[2/3] Don dep va khoi dong 4 cong ket noi (Tu dong ket noi lai)..." -ForegroundColor Yellow
+Get-Process kubectl -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Sleep -Seconds 1
+
+Start-Process powershell -ArgumentList "-NoProfile -Command while (`$true) { kubectl port-forward svc/einvoice-bff-service -n default 3000:80 --address 0.0.0.0; Start-Sleep 1 }" -WindowStyle Minimized
+Start-Process powershell -ArgumentList "-NoProfile -Command while (`$true) { kubectl port-forward svc/argocd-server -n argocd 8080:443 --address 0.0.0.0; Start-Sleep 1 }" -WindowStyle Minimized
+Start-Process powershell -ArgumentList "-NoProfile -Command while (`$true) { kubectl port-forward svc/prometheus-service -n default 9090:9090 --address 0.0.0.0; Start-Sleep 1 }" -WindowStyle Minimized
+Start-Process powershell -ArgumentList "-NoProfile -Command while (`$true) { kubectl port-forward svc/grafana-service -n default 3001:3000 --address 0.0.0.0; Start-Sleep 1 }" -WindowStyle Minimized
 
 Start-Sleep -Seconds 2
 
