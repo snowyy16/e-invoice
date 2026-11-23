@@ -135,6 +135,25 @@ jobs:
             cat trivy-fs-report.txt
           fi
 
+      - name: 2.3b. Generate Trivy FS SARIF Report
+        if: always()
+        uses: aquasecurity/trivy-action@38b337fff0a2f984d5be173c99e3f633438167ec # master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: 2.3c. Upload Trivy FS SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@d2aacf54c2fbc910db8d7ec338fdb54ea48c692d # v3
+        with:
+          sarif_file: 'trivy-fs-results.sarif'
+          category: 'trivy-fs'
+
       - name: Download Test Coverage Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -173,6 +192,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
 
     steps:
       - name: Checkout Code
@@ -211,6 +231,24 @@ jobs:
           severity: 'CRITICAL'
           ignore-unfixed: true
           exit-code: '1'
+
+      - name: Generate Trivy Image SARIF Report
+        if: always()
+        uses: aquasecurity/trivy-action@38b337fff0a2f984d5be173c99e3f633438167ec # master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-image-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Upload Trivy Image SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@d2aacf54c2fbc910db8d7ec338fdb54ea48c692d # v3
+        with:
+          sarif_file: 'trivy-image-results.sarif'
+          category: 'trivy-image'
 
       # --- chỉ đăng nhập + đẩy image khi KHÔNG phải pull request ---
       - name: Log in to GitHub Container Registry (GHCR)

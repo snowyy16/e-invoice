@@ -75,13 +75,16 @@ e-invoice/
 │   ├── schemas/                # Schema dữ liệu dùng chung
 │   └── utils/                  # Tiện ích tính thuế, ký số XML, JWT & mã hóa
 ├── k8s/                        # Hạ tầng Kubernetes (GitOps Manifests)
-│   ├── secret.yaml             # Kubernetes Secret lưu trữ biến môi trường nhạy cảm
+│   ├── sealed-secret.yaml      # Bitnami SealedSecret đã mã hóa an toàn để commit GitOps
+│   ├── secret.example.yaml     # Mẫu Kubernetes Secret (không chứa mật khẩu thật)
 │   ├── postgres.yaml           # PostgreSQL 16 Deployment, Service & PersistentVolumeClaim (1Gi)
 │   ├── deployment.yaml         # BFF Deployment (2 Replicas, Liveness/Readiness Probes) & Service
-│   ├── monitoring.yaml         # Prometheus & Grafana Deployment, ConfigMap & Service
+│   ├── monitoring.yaml         # Prometheus (Alert Rules), Alertmanager & Grafana Deployment/Service
+│   ├── alertmanager-telegram.example.yaml # Mẫu cấu hình Alertmanager gửi cảnh báo runtime qua Telegram
 │   └── dashboard.yaml          # ConfigMap Auto-Provisioning Grafana Dashboard (einvoice-bff-metrics)
+├── .gitleaks.toml              # Cấu hình ngoại lệ cho Gitleaks (bảo vệ secret thật, tránh cảnh báo nhầm)
 ├── Dockerfile                  # Multi-stage Dockerfile tối ưu dung lượng & chạy non-root (USER node)
-├── start-demo.ps1              # Script tự động mở 4 cổng Port-Forward (tự động kết nối lại)
+├── start-demo.ps1              # Script tự cô lập cluster E-Invoice & mở 5 cổng Port-Forward
 ├── sonar-project.properties    # Cấu hình phân tích mã nguồn tĩnh & LCOV Coverage cho SonarQube Cloud
 └── .sonarcloud.properties      # Cấu hình loại trừ nguồn quét cho SonarCloud
 ```
@@ -90,14 +93,14 @@ e-invoice/
 
 ## 🛠️ Công nghệ Sử dụng (Tech Stack)
 
-| Tầng (Layer)            | Công nghệ / Công cụ                                 | Vai trò trong hệ thống                                                                           |
-| :---------------------- | :-------------------------------------------------- | :----------------------------------------------------------------------------------------------- |
-| **Ứng dụng & CSDL**     | NestJS, Next.js, TypeScript, TypeORM, PostgreSQL 16 | Xử lý nghiệp vụ hóa đơn điện tử, ký số XML và lưu trữ dữ liệu                                    |
-| **CI & Build**          | Nx Workspace, pnpm, Jest, GitHub Actions            | Tự động hóa kiểm tra cú pháp, biên dịch, kiểm thử đơn vị & Code Coverage                         |
-| **Bảo mật (DevSecOps)** | Gitleaks, `pnpm audit`, SonarQube Cloud, Aqua Trivy | Quét Secret, lỗ hổng thư viện (SCA), mã nguồn tĩnh (SAST) và quét lỗ hổng Container Image        |
-| **Đóng gói & Registry** | Docker Buildx, GitHub Container Registry (GHCR)     | Đóng gói Multi-stage Image (`ghcr.io/snowyy16/e-invoice/bff`)                                    |
-| **Hạ tầng & GitOps**    | Kubernetes (`v1.30`), Argo CD                       | Điều phối Container có tính sẵn sàng cao (2 Replicas) và đồng bộ tự động từ nhánh `gitops`       |
-| **Giám sát & Cảnh báo** | Prometheus, Grafana, Telegram Bot API               | Thu thập chỉ số thời gian thực (`/api/metrics`), trực quan hóa Dashboard và gửi cảnh báo ChatOps |
+| Tầng (Layer)            | Công nghệ / Công cụ                                                 | Vai trò trong hệ thống                                                                        |
+| :---------------------- | :------------------------------------------------------------------ | :-------------------------------------------------------------------------------------------- |
+| **Ứng dụng & CSDL**     | NestJS, Next.js, TypeScript, TypeORM, PostgreSQL 16                 | Xử lý nghiệp vụ hóa đơn điện tử, ký số XML và lưu trữ dữ liệu                                 |
+| **CI & Build**          | Nx Workspace, pnpm, Jest, GitHub Actions                            | Tự động hóa kiểm tra cú pháp, biên dịch, kiểm thử đơn vị & Code Coverage                      |
+| **Bảo mật (DevSecOps)** | Gitleaks, `pnpm audit`, SonarQube Cloud, Aqua Trivy, Sealed Secrets | Quét Secret, SCA, SAST, Container Image, đẩy SARIF lên GitHub Security & mã hóa Secret GitOps |
+| **Đóng gói & Registry** | Docker Buildx, GitHub Container Registry (GHCR)                     | Đóng gói Multi-stage Image (`ghcr.io/snowyy16/e-invoice/bff`)                                 |
+| **Hạ tầng & GitOps**    | Kubernetes (`v1.30`), Argo CD                                       | Điều phối Container có tính sẵn sàng cao (2 Replicas) và đồng bộ tự động từ nhánh `gitops`    |
+| **Giám sát & Cảnh báo** | Prometheus, Alertmanager, Grafana, Telegram Bot API                 | Thu thập metrics (`/api/metrics`), luật cảnh báo runtime, Dashboard và thông báo ChatOps      |
 
 ---
 
@@ -111,7 +114,7 @@ kubectl get pods,svc,pvc,secret -n default
 
 ### 2. Mở kết nối (Port-Forward) tới các dịch vụ
 
-Chạy nhanh toàn bộ 4 cổng (tự động kết nối lại khi Pod cập nhật) bằng script PowerShell:
+Chạy nhanh toàn bộ 5 cổng (tự cô lập cluster cho E-Invoice và tự động kết nối lại) bằng script PowerShell:
 
 ```powershell
 .\start-demo.ps1
@@ -119,9 +122,18 @@ Chạy nhanh toàn bộ 4 cổng (tự động kết nối lại khi Pod cập n
 
 Hoặc mở thủ công từng dịch vụ:
 
-| Dịch vụ               | Lệnh Port-Forward                                                  | Địa chỉ truy cập                   |
-| :-------------------- | :----------------------------------------------------------------- | :--------------------------------- |
-| **Backend BFF API**   | `kubectl port-forward svc/einvoice-bff-service -n default 3000:80` | `http://localhost:3000/api/health` |
-| **Argo CD UI**        | `kubectl port-forward svc/argocd-server -n argocd 8080:443`        | `https://localhost:8080`           |
-| **Prometheus UI**     | `kubectl port-forward svc/prometheus-service -n default 9090:9090` | `http://localhost:9090/targets`    |
-| **Grafana Dashboard** | `kubectl port-forward svc/grafana-service -n default 3001:3000`    | `http://localhost:3001`            |
+| Dịch vụ               | Lệnh Port-Forward                                                    | Địa chỉ truy cập                   |
+| :-------------------- | :------------------------------------------------------------------- | :--------------------------------- |
+| **Backend BFF API**   | `kubectl port-forward svc/einvoice-bff-service -n default 3000:80`   | `http://localhost:3000/api/health` |
+| **Argo CD UI**        | `kubectl port-forward svc/argocd-server -n argocd 8080:443`          | `https://localhost:8080`           |
+| **Prometheus UI**     | `kubectl port-forward svc/prometheus-service -n default 9090:9090`   | `http://localhost:9090/targets`    |
+| **Grafana Dashboard** | `kubectl port-forward svc/grafana-service -n default 3001:3000`      | `http://localhost:3001`            |
+| **Alertmanager UI**   | `kubectl port-forward svc/alertmanager-service -n default 9093:9093` | `http://localhost:9093`            |
+
+### 3. Mã hóa lại Kubernetes Secret (Bitnami Sealed Secrets)
+
+Không commit file Secret dạng plaintext. Khi cần cập nhật `einvoice-secrets`, chỉnh từ [k8s/secret.example.yaml](k8s/secret.example.yaml) rồi mã hóa sang `k8s/sealed-secret.yaml`:
+
+```powershell
+kubeseal --controller-name=sealed-secrets-controller --controller-namespace=kube-system --namespace=default --format=yaml < secret-local.yaml > k8s/sealed-secret.yaml
+```

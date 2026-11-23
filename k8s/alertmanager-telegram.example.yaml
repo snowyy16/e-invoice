@@ -1,0 +1,31 @@
+# mẫu cấu hình Alertmanager gửi cảnh báo sự cố runtime (Pod Down, High RAM/Lag) trực tiếp về Telegram
+# Sao chép nội dung alertmanager.yml này vào Secret/ConfigMap nội bộ (không commit token thật lên Git)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+
+    route:
+      group_by: ['alertname', 'severity']
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 1h
+      receiver: 'telegram-alerts'
+
+    receivers:
+      - name: 'telegram-alerts'
+        telegram_configs:
+          - bot_token: '<TELEGRAM_BOT_TOKEN>'
+            chat_id: <TELEGRAM_CHAT_ID>
+            parse_mode: 'HTML'
+            send_resolved: true
+            message: |
+              {{ if eq .Status "firing" }}🚨 <b>CẢNH BÁO HỆ THỐNG E-INVOICE</b>{{ else }}✅ <b>ĐÃ KHẮC PHỤC SỰ CỐ</b>{{ end }}
+              {{ range .Alerts }}
+              • <b>Alert:</b> {{ .Labels.alertname }} ({{ .Labels.severity }})
+              • <b>Chi tiết:</b> {{ .Annotations.summary }} — {{ .Annotations.description }}
+              {{ end }}
