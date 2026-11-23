@@ -3,6 +3,9 @@ import {
   calculateInvoiceTotals,
   isValidVietnamTaxCode,
   generateLookupCode,
+  generateTaxAuthorityCode,
+  signJwtToken,
+  verifyJwtToken,
 } from './utils';
 
 describe('E-Invoice Financial Utils', () => {
@@ -51,6 +54,66 @@ describe('E-Invoice Financial Utils', () => {
 
   it('should generate valid lookup code', () => {
     const code = generateLookupCode('EINV');
-    expect(code).toMatch(/^EINV-[A-Z0-9]{6}$/);
+    expect(code).toMatch(/^EINV-[0-9A-F]{6}$/);
+  });
+
+  it('should generate valid tax authority code', () => {
+    const code = generateTaxAuthorityCode('0101248141');
+    expect(code).toMatch(/^CQT-0101248141-[A-Z0-9]+$/);
+  });
+});
+
+describe('JWT Utils', () => {
+  const originalJwtSecret = process.env['JWT_SECRET'];
+
+  afterEach(() => {
+    if (originalJwtSecret === undefined) {
+      delete process.env['JWT_SECRET'];
+    } else {
+      process.env['JWT_SECRET'] = originalJwtSecret;
+    }
+  });
+
+  it('should sign and verify a valid JWT token', () => {
+    process.env['JWT_SECRET'] = 'test-secret-key-minimum-32-chars-long';
+    const token = signJwtToken({
+      sub: 'user-1',
+      email: 'admin@einvoice.vn',
+      fullName: 'Admin',
+      role: 'ADMIN',
+    });
+
+    const payload = verifyJwtToken(token);
+    expect(payload).not.toBeNull();
+    expect(payload?.sub).toBe('user-1');
+    expect(payload?.email).toBe('admin@einvoice.vn');
+  });
+
+  it('should return null when JWT signature is tampered', () => {
+    process.env['JWT_SECRET'] = 'test-secret-key-minimum-32-chars-long';
+    const token = signJwtToken({
+      sub: 'user-1',
+      email: 'admin@einvoice.vn',
+      fullName: 'Admin',
+      role: 'ADMIN',
+    });
+    const parts = token.split('.');
+    const tamperedSig =
+      parts[2][0] === 'A' ? 'B' + parts[2].slice(1) : 'A' + parts[2].slice(1);
+    const tamperedToken = `${parts[0]}.${parts[1]}.${tamperedSig}`;
+
+    expect(verifyJwtToken(tamperedToken)).toBeNull();
+  });
+
+  it('should throw when JWT_SECRET is missing', () => {
+    delete process.env['JWT_SECRET'];
+    expect(() =>
+      signJwtToken({
+        sub: 'user-1',
+        email: 'admin@einvoice.vn',
+        fullName: 'Admin',
+        role: 'ADMIN',
+      }),
+    ).toThrow('Thiếu biến môi trường bắt buộc: JWT_SECRET');
   });
 });

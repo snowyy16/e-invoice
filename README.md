@@ -5,7 +5,7 @@
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-v1.30-326CE5?logo=kubernetes&logoColor=white)
 ![Argo CD](https://img.shields.io/badge/Argo%20CD-GitOps-EF7B4D?logo=argo&logoColor=white)
 ![NestJS](https://img.shields.io/badge/NestJS-BFF-E0234E?logo=nestjs&logoColor=white)
-![React](https://img.shields.io/badge/React-Frontend-61DAFB?logo=react&logoColor=black)
+![Next.js](https://img.shields.io/badge/Next.js-Frontend-000000?logo=nextdotjs&logoColor=white)
 
 Hệ thống quản lý, ký số và tra cứu **Hóa đơn Điện tử (E-Invoice)** được xây dựng trên kiến trúc **Nx Monorepo**, tích hợp chu trình **DevSecOps CI/CD khép kín** trên GitHub Actions, triển khai tự động theo mô hình **GitOps với Argo CD trên Kubernetes** và giám sát thời gian thực bằng **Prometheus & Grafana**.
 
@@ -23,13 +23,13 @@ flowchart TB
 
     subgraph CI_SEC["🛡️ 2. CI & Continuous Security (Shift-Left)"]
         direction LR
-        C["Job 1: CI Automation<br/>(ESLint, Prisma Migrate,<br/>Build & Health Check)"]
+        C["Job 1: CI Automation<br/>(ESLint, Build,<br/>Jest Unit Test & Coverage)"]
         D["Job 2: Security Scanning<br/>(Gitleaks, pnpm audit,<br/>Trivy FS & SonarQube Cloud)"]
     end
 
     subgraph ARTIFACT["📦 3. Artifact Management"]
         direction LR
-        E["Job 3: Docker Multi-Stage Build<br/>Push GHCR (:latest & :sha)<br/>+ Trivy Image Scan"]
+        E["Job 3: Docker Multi-Stage Build<br/>Trivy Image Scan &<br/>Push GHCR (:latest & :sha)"]
     end
 
     subgraph CD_GITOPS["🚀 4. Continuous Deployment & GitOps (Kubernetes)"]
@@ -48,8 +48,7 @@ flowchart TB
 
     %% Luồng chính
     B --> C
-    B --> D
-    C --> E
+    C --> D
     D --> E
     E --> F
     H --> I
@@ -63,19 +62,28 @@ e-invoice/
 ├── .github/workflows/
 │   └── devsecops.yml           # Pipeline DevSecOps 5 giai đoạn trên GitHub Actions
 ├── apps/
-│   ├── bff/                    # Backend-for-Frontend (NestJS, Prisma, JWT, XML/Digital Signature, Prometheus Metrics)
-│   └── web/                    # Giao diện người dùng & cổng tra cứu hóa đơn (React + Vite + TailwindCSS)
+│   ├── be/bff/                 # Backend-for-Frontend (NestJS, TypeORM, JWT, XML/Digital Signature, Prometheus Metrics)
+│   └── fe/
+│       ├── web-admin/          # Giao diện quản trị & kế toán (Next.js + TailwindCSS)
+│       └── web-portal/         # Cổng tra cứu hóa đơn điện tử (Next.js + TailwindCSS)
 ├── libs/
-│   ├── database/               # Prisma Schema, Migrations & Database Client dùng chung
-│   ├── shared/                 # DTOs, Interfaces & Hằng số dùng chung
-│   └── utils/                  # Tiện ích xử lý nghiệp vụ & mã hóa
+│   ├── constants/              # Hằng số, Enum trạng thái hóa đơn & phân quyền (RBAC)
+│   ├── decorators/             # Custom Decorators (@Roles)
+│   ├── entities/               # TypeORM Entities (InvoiceEntity, UserEntity)
+│   ├── guards/                 # JwtAuthGuard & RolesGuard
+│   ├── interfaces/             # Interfaces & kiểu dữ liệu dùng chung
+│   ├── schemas/                # Schema dữ liệu dùng chung
+│   └── utils/                  # Tiện ích tính thuế, ký số XML, JWT & mã hóa
 ├── k8s/                        # Hạ tầng Kubernetes (GitOps Manifests)
 │   ├── secret.yaml             # Kubernetes Secret lưu trữ biến môi trường nhạy cảm
 │   ├── postgres.yaml           # PostgreSQL 16 Deployment, Service & PersistentVolumeClaim (1Gi)
 │   ├── deployment.yaml         # BFF Deployment (2 Replicas, Liveness/Readiness Probes) & Service
-│   └── monitoring.yaml         # Prometheus & Grafana Deployment, ConfigMap & Service
-├── Dockerfile                  # Multi-stage Dockerfile tối ưu hóa dung lượng & chạy non-root user
-└── .sonarcloud.properties      # Cấu hình phân tích mã nguồn tĩnh SonarQube Cloud
+│   ├── monitoring.yaml         # Prometheus & Grafana Deployment, ConfigMap & Service
+│   └── dashboard.yaml          # ConfigMap Auto-Provisioning Grafana Dashboard (einvoice-bff-metrics)
+├── Dockerfile                  # Multi-stage Dockerfile tối ưu dung lượng & chạy non-root (USER node)
+├── start-demo.ps1              # Script tự động mở 4 cổng Port-Forward (tự động kết nối lại)
+├── sonar-project.properties    # Cấu hình phân tích mã nguồn tĩnh & LCOV Coverage cho SonarQube Cloud
+└── .sonarcloud.properties      # Cấu hình loại trừ nguồn quét cho SonarCloud
 ```
 
 ---
@@ -84,8 +92,8 @@ e-invoice/
 
 | Tầng (Layer)            | Công nghệ / Công cụ                                 | Vai trò trong hệ thống                                                                           |
 | :---------------------- | :-------------------------------------------------- | :----------------------------------------------------------------------------------------------- |
-| **Ứng dụng & CSDL**     | NestJS, React, TypeScript, Prisma, PostgreSQL 16    | Xử lý nghiệp vụ hóa đơn điện tử, ký số XML và lưu trữ dữ liệu                                    |
-| **CI & Build**          | Nx Workspace, pnpm, GitHub Actions                  | Tự động hóa kiểm tra cú pháp, biên dịch và kiểm thử                                              |
+| **Ứng dụng & CSDL**     | NestJS, Next.js, TypeScript, TypeORM, PostgreSQL 16 | Xử lý nghiệp vụ hóa đơn điện tử, ký số XML và lưu trữ dữ liệu                                    |
+| **CI & Build**          | Nx Workspace, pnpm, Jest, GitHub Actions            | Tự động hóa kiểm tra cú pháp, biên dịch, kiểm thử đơn vị & Code Coverage                         |
 | **Bảo mật (DevSecOps)** | Gitleaks, `pnpm audit`, SonarQube Cloud, Aqua Trivy | Quét Secret, lỗ hổng thư viện (SCA), mã nguồn tĩnh (SAST) và quét lỗ hổng Container Image        |
 | **Đóng gói & Registry** | Docker Buildx, GitHub Container Registry (GHCR)     | Đóng gói Multi-stage Image (`ghcr.io/snowyy16/e-invoice/bff`)                                    |
 | **Hạ tầng & GitOps**    | Kubernetes (`v1.30`), Argo CD                       | Điều phối Container có tính sẵn sàng cao (2 Replicas) và đồng bộ tự động từ nhánh `gitops`       |
@@ -102,6 +110,14 @@ kubectl get pods,svc,pvc,secret -n default
 ```
 
 ### 2. Mở kết nối (Port-Forward) tới các dịch vụ
+
+Chạy nhanh toàn bộ 4 cổng (tự động kết nối lại khi Pod cập nhật) bằng script PowerShell:
+
+```powershell
+.\start-demo.ps1
+```
+
+Hoặc mở thủ công từng dịch vụ:
 
 | Dịch vụ               | Lệnh Port-Forward                                                  | Địa chỉ truy cập                   |
 | :-------------------- | :----------------------------------------------------------------- | :--------------------------------- |

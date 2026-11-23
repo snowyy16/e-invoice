@@ -43,7 +43,7 @@ export function isValidVietnamTaxCode(taxCode: string): boolean {
  * Sinh mã tra cứu hóa đơn ngẫu nhiên chuẩn 10 ký tự in hoa
  */
 export function generateLookupCode(prefix = 'EINV'): string {
-  const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const randomPart = crypto.randomBytes(3).toString('hex').toUpperCase();
   return `${prefix}-${randomPart}`;
 }
 
@@ -52,10 +52,7 @@ export function generateLookupCode(prefix = 'EINV'): string {
  */
 export function generateTaxAuthorityCode(taxCode = '0108999888'): string {
   const timestamp = Date.now().toString(36).toUpperCase();
-  const randomHex = Math.floor(Math.random() * 0xffffff)
-    .toString(16)
-    .toUpperCase()
-    .padStart(6, '0');
+  const randomHex = crypto.randomBytes(3).toString('hex').toUpperCase();
   return `CQT-${taxCode}-${timestamp}${randomHex}`;
 }
 
@@ -243,7 +240,11 @@ export interface IJwtPayload {
 }
 
 function getJwtSecret(): string {
-  return process.env['JWT_SECRET'] || 'einvoice-enterprise-secret-2026';
+  const secret = process.env['JWT_SECRET'];
+  if (!secret) {
+    throw new Error('Thiếu biến môi trường bắt buộc: JWT_SECRET');
+  }
+  return secret;
 }
 
 export function signJwtToken(
@@ -283,7 +284,14 @@ export function verifyJwtToken(token: string): IJwtPayload | null {
       .update(`${base64Header}.${base64Payload}`)
       .digest('base64url');
 
-    if (signature !== expectedSig) return null;
+    const sigBuf = Buffer.from(signature);
+    const expectedBuf = Buffer.from(expectedSig);
+    if (
+      sigBuf.length !== expectedBuf.length ||
+      !crypto.timingSafeEqual(sigBuf, expectedBuf)
+    ) {
+      return null;
+    }
 
     const payload: IJwtPayload = JSON.parse(
       Buffer.from(base64Payload, 'base64url').toString('utf8'),

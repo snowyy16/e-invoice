@@ -9,3 +9,5 @@ allowBuilds:
 packages:
   - 'apps/**'
   - 'libs/*'
+overrides:
+  multer: '^2.5.0'

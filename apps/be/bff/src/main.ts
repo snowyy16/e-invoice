@@ -2,6 +2,7 @@
  * khởi tạo máy chủ dịch vụ backend trung gian xử lý nghiệp vụ hóa đơn điện tử
  */
 
+import 'pg';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';

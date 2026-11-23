@@ -37,6 +37,7 @@ export class AppController {
   }
 
   @Get('invoices')
+  @UseGuards(JwtAuthGuard)
   getInvoices() {
     return this.appService.findAll();
   }
@@ -61,6 +62,7 @@ export class AppController {
   }
 
   @Post('invoices')
+  @UseGuards(JwtAuthGuard)
   createInvoice(
     @Body()
     body: {
