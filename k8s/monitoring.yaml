@@ -221,7 +221,7 @@ data:
       receiver: 'default-receiver'
     receivers:
       - name: 'default-receiver'
-      # Để bật gửi cảnh báo runtime trực tiếp về Telegram, xem mẫu k8s/alertmanager-telegram.example.yaml
+      # Để bật gửi cảnh báo runtime trực tiếp về Telegram, xem mẫu docs/k8s-examples/alertmanager-telegram.example.yaml
 ---
 apiVersion: apps/v1
 kind: Deployment

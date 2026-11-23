@@ -74,13 +74,14 @@ e-invoice/
 │   ├── interfaces/             # Interfaces & kiểu dữ liệu dùng chung
 │   ├── schemas/                # Schema dữ liệu dùng chung
 │   └── utils/                  # Tiện ích tính thuế, ký số XML, JWT & mã hóa
+├── docs/k8s-examples/
+│   ├── secret.example.yaml     # Mẫu Kubernetes Secret (không chứa mật khẩu thật)
+│   └── alertmanager-telegram.example.yaml # Mẫu cấu hình Alertmanager gửi cảnh báo runtime qua Telegram
 ├── k8s/                        # Hạ tầng Kubernetes (GitOps Manifests)
 │   ├── sealed-secret.yaml      # Bitnami SealedSecret đã mã hóa an toàn để commit GitOps
-│   ├── secret.example.yaml     # Mẫu Kubernetes Secret (không chứa mật khẩu thật)
 │   ├── postgres.yaml           # PostgreSQL 16 Deployment, Service & PersistentVolumeClaim (1Gi)
 │   ├── deployment.yaml         # BFF Deployment (2 Replicas, Liveness/Readiness Probes) & Service
 │   ├── monitoring.yaml         # Prometheus (Alert Rules), Alertmanager & Grafana Deployment/Service
-│   ├── alertmanager-telegram.example.yaml # Mẫu cấu hình Alertmanager gửi cảnh báo runtime qua Telegram
 │   └── dashboard.yaml          # ConfigMap Auto-Provisioning Grafana Dashboard (einvoice-bff-metrics)
 ├── .gitleaks.toml              # Cấu hình ngoại lệ cho Gitleaks (bảo vệ secret thật, tránh cảnh báo nhầm)
 ├── Dockerfile                  # Multi-stage Dockerfile tối ưu dung lượng & chạy non-root (USER node)
@@ -132,7 +133,7 @@ Hoặc mở thủ công từng dịch vụ:
 
 ### 3. Mã hóa lại Kubernetes Secret (Bitnami Sealed Secrets)
 
-Không commit file Secret dạng plaintext. Khi cần cập nhật `einvoice-secrets`, chỉnh từ [k8s/secret.example.yaml](k8s/secret.example.yaml) rồi mã hóa sang `k8s/sealed-secret.yaml`:
+Không commit file Secret dạng plaintext. Khi cần cập nhật `einvoice-secrets`, chỉnh từ [docs/k8s-examples/secret.example.yaml](docs/k8s-examples/secret.example.yaml) rồi mã hóa sang `k8s/sealed-secret.yaml`:
 
 ```powershell
 kubeseal --controller-name=sealed-secrets-controller --controller-namespace=kube-system --namespace=default --format=yaml < secret-local.yaml > k8s/sealed-secret.yaml
