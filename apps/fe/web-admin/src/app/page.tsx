@@ -90,7 +90,7 @@ export default function AdminDashboardPage() {
       setCurrentUser(stored);
     }
 
-    fetch(`${API_URL}/invoices`)
+    fetch(`${API_URL}/invoices`, { headers: getAuthHeaders() })
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) setInvoices(data);
@@ -196,7 +196,7 @@ export default function AdminDashboardPage() {
 
     fetch(`${API_URL}/invoices`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         buyerName,
         buyerTaxCode,

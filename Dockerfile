@@ -17,6 +17,8 @@ RUN pnpm nx build bff
 # giai đoạn khởi chạy môi trường thực tế
 FROM node:20-alpine AS runner
 
+RUN apk upgrade --no-cache
+
 WORKDIR /app
 ENV NODE_ENV=production
 

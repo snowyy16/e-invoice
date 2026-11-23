@@ -108,7 +108,6 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
 
       # ---2.2 kiểm toán lỗ hổng thư viện phụ thuộc ---
       - name: 2.2. Dependency Vulnerability Audit
@@ -125,12 +124,25 @@ jobs:
           format: 'table'
           output: 'trivy-fs-report.txt'
           severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+          exit-code: '1'
 
       - name: Display Trivy FS Scan Results
+        if: always()
         run: |
           if [ -f trivy-fs-report.txt ]; then
             cat trivy-fs-report.txt
           fi
+
+      - name: Download Test Coverage Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: code-coverage-report
+          path: coverage/
+      - name: Fix LCOV Paths for Monorepo Root
+        run: |
+          sed -i 's|^SF:|SF:apps/be/bff/|' coverage/apps/be/bff/lcov.info
+          sed -i 's|^SF:|SF:libs/utils/|' coverage/libs/utils/lcov.info
 
       # ---2.4 phân tích chất lượng mã nguồn bằng sonarqube và sonarcloud ---
       - name: 2.4. SonarQube Code Quality Analysis
@@ -193,8 +205,9 @@ jobs:
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           format: 'table'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '0'
+          severity: 'CRITICAL'
+          ignore-unfixed: true
+          exit-code: '1'
 
       # --- chỉ đăng nhập + đẩy image khi KHÔNG phải pull request ---
       - name: Log in to GitHub Container Registry (GHCR)
