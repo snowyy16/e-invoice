@@ -26,12 +26,22 @@ spec:
       labels:
         app: einvoice-postgres
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: postgres
           image: postgres:16-alpine
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432
+          resources:
+            requests:
+              memory: '256Mi'
+              cpu: '100m'
+              ephemeral-storage: '256Mi'
+            limits:
+              memory: '512Mi'
+              cpu: '500m'
+              ephemeral-storage: '1Gi'
           env:
             - name: POSTGRES_USER
               valueFrom:

@@ -32,4 +32,7 @@ async function bootstrap() {
   );
 }
 
-bootstrap();
+bootstrap().catch((err) => {
+  Logger.error('Lỗi khởi động ứng dụng BFF', err);
+  process.exit(1);
+});

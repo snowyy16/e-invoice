@@ -32,12 +32,22 @@ spec:
       labels:
         app: prometheus
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: prometheus
           image: prom/prometheus:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9090
+          resources:
+            requests:
+              memory: '128Mi'
+              cpu: '100m'
+              ephemeral-storage: '256Mi'
+            limits:
+              memory: '512Mi'
+              cpu: '500m'
+              ephemeral-storage: '1Gi'
           volumeMounts:
             - name: config-volume
               mountPath: /etc/prometheus/prometheus.yml
@@ -107,12 +117,22 @@ spec:
       labels:
         app: grafana
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: grafana
           image: grafana/grafana:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
+          resources:
+            requests:
+              memory: '128Mi'
+              cpu: '100m'
+              ephemeral-storage: '256Mi'
+            limits:
+              memory: '512Mi'
+              cpu: '500m'
+              ephemeral-storage: '1Gi'
           env:
             - name: GF_SECURITY_ADMIN_USER
               value: 'admin'

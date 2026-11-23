@@ -151,7 +151,6 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        continue-on-error: true
 
       # ---2.5 cổng bảo mật lưu báo cáo bảo mật ---
       - name: 2.5. Upload Security Reports (Nexus / Artifact Stand-in)

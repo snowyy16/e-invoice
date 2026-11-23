@@ -15,6 +15,7 @@ spec:
       labels:
         app: einvoice-bff
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: bff
           image: ghcr.io/snowyy16/e-invoice/bff:latest
@@ -44,9 +45,11 @@ spec:
             requests:
               memory: '128Mi'
               cpu: '100m'
+              ephemeral-storage: '128Mi'
             limits:
               memory: '512Mi'
               cpu: '500m'
+              ephemeral-storage: '512Mi'
           readinessProbe:
             httpGet:
               path: /api/health
