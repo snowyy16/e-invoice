@@ -8,9 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  packages: write
-  security-events: write
+  contents: read
 
 env:
   REGISTRY: ghcr.io
@@ -40,7 +38,7 @@ jobs:
           node-version: 20
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 12.18.0
 
@@ -85,6 +83,9 @@ jobs:
     name: 2. Continuous Security (Gitleaks, Audit, Trivy & Sonar)
     needs: ci-build-and-test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
       - name: Checkout Code
@@ -99,13 +100,13 @@ jobs:
           node-version: 20
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 12.18.0
 
       # ---2.1 phát hiện rò rỉ khóa bí mật bằng gitleaks ---
       - name: 2.1. Secret Detection (Gitleaks)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -117,7 +118,7 @@ jobs:
 
       # ---2.3 quét hệ thống tệp tin và thư viện phụ thuộc bằng trivy ---
       - name: 2.3. Trivy Filesystem & Dependency Scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@38b337fff0a2f984d5be173c99e3f633438167ec # master
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -146,7 +147,7 @@ jobs:
 
       # ---2.4 phân tích chất lượng mã nguồn bằng sonarqube và sonarcloud ---
       - name: 2.4. SonarQube Code Quality Analysis
-        uses: sonarsource/sonarqube-scan-action@master
+        uses: sonarsource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -170,17 +171,20 @@ jobs:
     name: 3. Artifact Management (Docker & GHCR)
     needs: continuous-security
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Extract Metadata (Tags, Labels)
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -190,7 +194,7 @@ jobs:
 
       # --- đóng gói ảnh docker cục bộ để quét bảo mật ---
       - name: Docker Build (Local for Scanning)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: .
           file: ./Dockerfile
@@ -201,7 +205,7 @@ jobs:
 
       # --- quét lỗ hổng bảo mật ảnh container bằng trivy ---
       - name: Run Trivy Image Scan (Security Gate)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@38b337fff0a2f984d5be173c99e3f633438167ec # master
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           format: 'table'
@@ -212,7 +216,7 @@ jobs:
       # --- chỉ đăng nhập + đẩy image khi KHÔNG phải pull request ---
       - name: Log in to GitHub Container Registry (GHCR)
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -220,7 +224,7 @@ jobs:
 
       - name: Push Docker Image to GHCR
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: .
           file: ./Dockerfile
@@ -237,6 +241,8 @@ jobs:
     name: 4. CD Deployment (Approval & Argo CD)
     needs: docker-build-and-publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
 
     # kích hoạt tính năng phê duyệt môi trường triển khai thủ công trên github
