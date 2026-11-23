@@ -4,7 +4,10 @@ title = "E-Invoice Gitleaks Configuration"
 useDefault = true
 
 [allowlist]
-description = "Allow public SonarCloud projectKey"
+description = "Allow public SonarCloud projectKey and RSA-encrypted Bitnami SealedSecret"
+paths = [
+  '''(?:^|/)k8s/sealed-secret\.yaml$''',
+]
 regexTarget = "line"
 regexes = [
   '''sonar\.projectKey=snowyy16_e-invoice''',

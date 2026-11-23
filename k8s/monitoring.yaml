@@ -7,6 +7,12 @@ data:
   prometheus.yml: |
     global:
       scrape_interval: 5s
+    rule_files:
+      - 'alert.rules.yml'
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets: ['alertmanager-service:9093']
     scrape_configs:
       - job_name: 'prometheus'
         static_configs:
@@ -15,6 +21,34 @@ data:
         metrics_path: '/api/metrics'
         static_configs:
           - targets: ['einvoice-bff-service:80']
+  alert.rules.yml: |
+    groups:
+      - name: einvoice-bff-alerts
+        rules:
+          - alert: EinvoiceBffDown
+            expr: up{job="einvoice-bff"} == 0
+            for: 30s
+            labels:
+              severity: critical
+            annotations:
+              summary: "Dịch vụ Backend BFF bị gián đoạn"
+              description: "Target {{ $labels.instance }} không phản hồi trong hơn 30 giây."
+          - alert: EinvoiceBffHighMemory
+            expr: process_resident_memory_bytes{job="einvoice-bff"} > 367001600
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Bộ nhớ RAM BFF vượt ngưỡng 350 MiB"
+              description: "Pod {{ $labels.instance }} đang tiêu thụ RAM cao kéo dài quá 1 phút."
+          - alert: EinvoiceBffHighEventLoopLag
+            expr: nodejs_eventloop_lag_seconds{job="einvoice-bff"} > 0.1
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Độ trễ Event Loop Node.js cao (> 100ms)"
+              description: "Event Loop của {{ $labels.instance }} bị nghẽn kéo dài hơn 1 phút."
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -52,6 +86,9 @@ spec:
             - name: config-volume
               mountPath: /etc/prometheus/prometheus.yml
               subPath: prometheus.yml
+            - name: config-volume
+              mountPath: /etc/prometheus/alert.rules.yml
+              subPath: alert.rules.yml
       volumes:
         - name: config-volume
           configMap:
@@ -167,3 +204,76 @@ spec:
   ports:
     - port: 3000
       targetPort: 3000
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname', 'severity']
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 1h
+      receiver: 'default-receiver'
+    receivers:
+      - name: 'default-receiver'
+      # Để bật gửi cảnh báo runtime trực tiếp về Telegram, xem mẫu k8s/alertmanager-telegram.example.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  labels:
+    app: alertmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:v0.27.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - '--config.file=/etc/alertmanager/alertmanager.yml'
+            - '--storage.path=/alertmanager'
+          ports:
+            - containerPort: 9093
+          resources:
+            requests:
+              memory: '64Mi'
+              cpu: '50m'
+              ephemeral-storage: '128Mi'
+            limits:
+              memory: '256Mi'
+              cpu: '200m'
+              ephemeral-storage: '512Mi'
+          volumeMounts:
+            - name: alertmanager-config-volume
+              mountPath: /etc/alertmanager
+      volumes:
+        - name: alertmanager-config-volume
+          configMap:
+            name: alertmanager-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-service
+spec:
+  type: ClusterIP
+  selector:
+    app: alertmanager
+  ports:
+    - port: 9093
+      targetPort: 9093
