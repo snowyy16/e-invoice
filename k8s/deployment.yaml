@@ -18,7 +18,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: bff
-          image: ghcr.io/snowyy16/e-invoice/bff:latest
+          image: ghcr.io/snowyy16/e-invoice/bff:fe48e9ad3277cb120cd6a5ba1652a9bcfc5f911a
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
