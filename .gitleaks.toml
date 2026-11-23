@@ -1,0 +1,15 @@
+title = "E-Invoice Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Allow public SonarCloud projectKey in sonar-project.properties"
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''^sonar-project\.properties$''',
+]
+regexes = [
+  '''^\s*sonar\.projectKey=snowyy16_e-invoice\s*$''',
+]
